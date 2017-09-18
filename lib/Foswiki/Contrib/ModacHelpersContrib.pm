@@ -15,30 +15,51 @@ our $NO_PREFS_IN_TOPIC = 1;
 sub updateTopicLinks {
   my ($oldWeb, $oldTopic, $newWeb, $newTopic) = @_;
 
-  my ($oldTopicMeta, undef) = Foswiki::Func::readTopic($oldWeb, $oldTopic);
-  my $localReferringTopics = Foswiki::UI::Rename::_getReferringTopics($Foswiki::Plugins::SESSION, $oldTopicMeta, 0);
-  my $globalReferringTopics = Foswiki::UI::Rename::_getReferringTopics($Foswiki::Plugins::SESSION, $oldTopicMeta, 1);
-  my %allReferringTopics = (%$localReferringTopics, %$globalReferringTopics);
-  my @allReferringTopicNames = keys(%allReferringTopics);
+  my $allReferringTopicPaths = getReferringTopics($oldWeb, $oldTopic);
 
-  my $updateLinkOptions = {
-      oldWeb => $oldWeb,
-      oldTopic => $oldTopic,
-      newWeb => $newWeb,
-      newTopic => $newTopic,
-      inWeb => $newWeb,
+  foreach my $topicPath (@$allReferringTopicPaths) {
+      my ( $web, $topic ) = Foswiki::Func::normalizeWebTopicName(undef, $topicPath);
+      my $topicObject =
+        Foswiki::Meta->load( $Foswiki::Plugins::SESSION, $web, $topic );
+      rewriteLinks($topicObject, $oldWeb, $oldTopic, $newWeb, $newTopic);
+
+  }
+  return;
+}
+
+sub getReferringTopics {
+  my ($web, $topic) = @_;
+  my ($topicMeta, undef) = Foswiki::Func::readTopic($web, $topic);
+  my $localReferringTopics = Foswiki::UI::Rename::_getReferringTopics($Foswiki::Plugins::SESSION, $topicMeta, 0);
+  my $globalReferringTopics = Foswiki::UI::Rename::_getReferringTopics($Foswiki::Plugins::SESSION, $topicMeta, 1);
+  my %allReferringTopics = (%$localReferringTopics, %$globalReferringTopics);
+  my @allReferringTopicPaths = keys(%allReferringTopics);
+
+  return \@allReferringTopicPaths;
+}
+
+sub rewriteLinks {
+  my ( $topicObject, $oldLinkWeb, $oldLinkTopic, $newLinkWeb, $newLinkTopic ) = @_;
+  my $renderer = $Foswiki::Plugins::SESSION->renderer;
+  require Foswiki::Render;
+
+
+  my $rewriteLinkOptions = {
+      oldWeb => $oldLinkWeb,
+      oldTopic => $oldLinkTopic,
+      newWeb => $newLinkWeb,
+      newTopic => $newLinkTopic,
       fullPaths => 0,
       noautolink => 1,
       in_pre => 0,
       in_noautolink => 0,
-      in_literal => 0,
-
+      in_literal => 0
   };
 
-  Foswiki::UI::Rename::_updateReferringTopics($Foswiki::Plugins::SESSION, \@allReferringTopicNames, \&Foswiki::UI::Rename::_replaceTopicReferences,
-  $updateLinkOptions);
-
-  return;
+  my $text =
+    $renderer->forEachLine( $topicObject->text(), \&Foswiki::UI::Rename::_replaceTopicReferences, $rewriteLinkOptions );
+  $topicObject->text($text);
+  $topicObject->save( minor => 1 );
 }
 
 1;
