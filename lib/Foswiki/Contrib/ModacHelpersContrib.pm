@@ -21,6 +21,9 @@ sub updateTopicLinks {
       my ( $web, $topic ) = Foswiki::Func::normalizeWebTopicName(undef, $topicPath);
       my $topicObject =
         Foswiki::Meta->load( $Foswiki::Plugins::SESSION, $web, $topic );
+      unless ( $topicObject->haveAccess('CHANGE') ) {
+          next;
+      }
       rewriteLinks($topicObject, $oldWeb, $oldTopic, $newWeb, $newTopic);
 
   }
