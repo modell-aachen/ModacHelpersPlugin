@@ -1,0 +1,23 @@
+%META:TOPICPARENT{name="Contribs"}%
+---+ ModacHelpers Contrib
+
+%SHORTDESCRIPTION%
+
+This Contrib provides several helper functions.
+
+---++ Installation
+%$INSTALL_INSTRUCTIONS%
+
+---++ Contrib Info
+
+|  Author: | Modell Aachen !GmbH |
+|  Copyright: | 2016, Modell Aachen !GmbH, All Rights Reserved |
+|  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
+|  Dependencies: |  |
+|  Version: | %$VERSION% |
+|  Release: | %$RELEASE% |
+|  Change&nbsp;History: | <!-- versions below in reverse order -->&nbsp; |
+|  1.0.0 (2016.07.28): | Initial version |
+|  Home: | http://modell-aachen.de |
+|  Support: | http://modell-aachen.de |
+
