@@ -1,4 +1,4 @@
-package Foswiki::Contrib::ModacHelpersContrib;
+package Foswiki::Plugins::ModacHelpersPlugin;
 
 # Always use strict to enforce variable scoping
 use strict;
@@ -9,7 +9,7 @@ use Foswiki::UI::Rename;
 
 our $VERSION = "1.0";
 our $RELEASE = "1.0";
-our $SHORTDESCRIPTION = 'This contrib provides several helper functions.';
+our $SHORTDESCRIPTION = 'This plugin provides several helper functions.';
 our $NO_PREFS_IN_TOPIC = 1;
 
 sub updateTopicLinks {
