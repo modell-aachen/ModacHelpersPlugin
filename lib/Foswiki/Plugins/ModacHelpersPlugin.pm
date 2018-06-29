@@ -117,21 +117,31 @@ sub _handleRESTWebs {
 sub _handleRESTWebTopics {
   my ( %session, undef, undef, $response ) = @_;
   my $request = Foswiki::Func::getRequestObject();
-  my $web = $request->param("webname");
+  my @websParam = $request->multi_param("webname");
   my $json = JSON->new->utf8;
 
-  die unless $web;
+  die unless @websParam;
+
+  # prepare web restriction query
+  my $websExist = 1;
+  my $webRestrictionQuery = "";
+  foreach my $web (@websParam) {
+    $webRestrictionQuery .= ($webRestrictionQuery ne "")?' OR ':'';
+    $websExist &= Foswiki::Func::webExists( $web );
+    last unless $websExist;
+    $webRestrictionQuery .= "web:$web";
+  }
 
   my @webTopics = ();
-  if( Foswiki::Func::webExists( $web ) ) {
+  if( $websExist ) {
     my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
-    my $query = "type:topic AND web:$web";
+    my $query = "type:topic AND ($webRestrictionQuery)";
     my %params = (
       rows => 9999,
       fl => 'web,topic,webtopic,title,preference*',
       sort => 'title asc'
     );
-
+print "QUERY: $query \n\n";
     my $wikiUser = Foswiki::Func::getWikiName();
     unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
         push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
@@ -159,7 +169,7 @@ sub _handleRESTWebTopics {
   my @filteredWebTopics = ();
   foreach my $topic (@webTopics) {
     my %topic = %{$topic};
-    my $isValidTopic = _isValidItem( $topic{name}, @invalidTopics );
+    my $isValidTopic = _isValidItem( $topic{topic}, @invalidTopics );
 
     if( !$isValidTopic || (grep(/^TechnicalTopic$/, @{$topic{preference}}) && $topic{preference_TechnicalTopic_s} eq "1" ) ) {
       next; # skip this topic per definition
@@ -167,7 +177,7 @@ sub _handleRESTWebTopics {
 
     my %webTopic;
     $webTopic{name} = $topic{topic};
-    $webTopic{web} = $web;
+    $webTopic{web} = $topic{web};
     $webTopic{title} = $topic{title};
 
     push @filteredWebTopics, {%webTopic};
