@@ -15,6 +15,9 @@ our $SHORTDESCRIPTION = 'This plugin provides several helper functions.';
 our $NO_PREFS_IN_TOPIC = 1;
 
 sub initPlugin {
+
+
+
   Foswiki::Func::registerRESTHandler('webs', \&_handleRESTWebs,
     authenticate  => 1,
     http_allow    => 'GET',
@@ -91,6 +94,8 @@ sub _handleRESTWebs {
   return to_json(\@webs);
 }
 
+
+
 sub _handleRESTWebTopics {
   my ( %session, undef, undef, $response ) = @_;
   my $request = Foswiki::Func::getRequestObject();
@@ -104,22 +109,45 @@ sub _handleRESTWebTopics {
   }
   # filter topic names and build full-qualified object
   # webTopic = { title: 'Sample Web Name', name: 'SampleWebName', web: 'Processes' }
+  my @topicFilter = (
+      '^WebHome$',
+      '^WebActions$',
+      '^WebTopicList$',
+      '^WebChanges$',
+      '^WebSearch$',
+      '^WebPreferences$',
+      '^FormManager$',
+      'Template$',
+      'ExtraField$'
+  );
   my @filteredWebTopics = ();
   foreach(@webTopics) {
-    my %webTopic;
-    $webTopic{name} = $_;
-    $webTopic{web} = $web;
+    my $topic = $_;
+    my $isValidTopic = 1;
 
-    if( Foswiki::Func::checkAccessPermission( "VIEW", $session{user}, undef, $webTopic{name}, $webTopic{web} ) ) {
+    foreach(@topicFilter) {
+      $isValidTopic &= !($topic =~ m/$_/);
+    }
+
+    if( $isValidTopic && Foswiki::Func::checkAccessPermission( "VIEW", $session{user}, undef, $topic, $web) ) {
+      my %webTopic;
+      $webTopic{name} = $topic;
+      $webTopic{web} = $web;
+
       my ($topicMeta, $text) = Foswiki::Func::readTopic($webTopic{web}, $webTopic{name});
+
+      if( $topicMeta->getPreference('TechnicalTopic') && $topicMeta->getPreference( 'TechnicalTopic' )->{value} ) {
+        next; # skip this topic per definition
+      }
+
       if( $topicMeta->get( 'FIELD', 'TopicTitle' ) ) {
         $webTopic{title} = $topicMeta->get( 'FIELD', 'TopicTitle' )->{value};
       }else{
         $webTopic{title} = $webTopic{name};
       }
-    }
 
-    push @filteredWebTopics, {%webTopic};
+      push @filteredWebTopics, {%webTopic};
+    }
   }
 
   return to_json(\@filteredWebTopics);
