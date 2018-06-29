@@ -80,7 +80,7 @@ sub getNonSatisfiedFormFields {
     my $formDef = new Foswiki::Form($meta->session(), $meta->web(), $formName);
     return () unless $formDef;
 
-    my $mappings;
+    my $mappings; # lazy loaded
 
     my @unsatisfied;
     foreach my $field (@{$formDef->getFields}) {
@@ -90,15 +90,7 @@ sub getNonSatisfiedFormFields {
         my $fieldDef = $formDef->getField($field->{name});
         next unless $fieldDef->isMandatory();
 
-        unless(defined $mappings) {
-            Foswiki::Func::loadTemplate('DocumentFormTable');
-            my $modacformtable_mappings = Foswiki::Func::expandTemplate('modacformtable_mappings');
-            $modacformtable_mappings = Foswiki::Func::expandCommonVariables($modacformtable_mappings);
-            $modacformtable_mappings =~ s#^\s+##;
-            $modacformtable_mappings =~ s#\s+$##;
-            my @parts = split(/\s*,\s*/, $modacformtable_mappings);
-            $mappings = { map{ split(/=/, $_, 2) } @parts };
-        }
+        $mappings = getDocumentFormTableMappings() unless defined $mappings;
 
         $fieldDef->{mapped_title} = $mappings->{$field->{name}};
         $fieldDef->{mapped_title} = $field->{name} unless defined $fieldDef->{mapped_title} && $fieldDef->{mapped_title} ne '';
@@ -106,6 +98,16 @@ sub getNonSatisfiedFormFields {
         push @unsatisfied, $fieldDef;
     }
     return @unsatisfied;
+}
+
+sub getDocumentFormTableMappings {
+    Foswiki::Func::loadTemplate('DocumentFormTable');
+    my $modacformtable_mappings = Foswiki::Func::expandTemplate('modacformtable_mappings');
+    $modacformtable_mappings = Foswiki::Func::expandCommonVariables($modacformtable_mappings);
+    $modacformtable_mappings =~ s#^\s+##;
+    $modacformtable_mappings =~ s#\s+$##;
+    my @parts = split(/\s*,\s*/, $modacformtable_mappings);
+    return { map{ split(/=/, $_, 2) } @parts };
 }
 
 1;
