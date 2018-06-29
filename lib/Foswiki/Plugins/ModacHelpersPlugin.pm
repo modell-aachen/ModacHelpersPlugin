@@ -16,7 +16,11 @@ our $NO_PREFS_IN_TOPIC = 1;
 
 sub initPlugin {
 
-
+  if ($Foswiki::cfg{Plugins}{SolrPlugin}{Enabled}) {
+    require Foswiki::Plugins::SolrPlugin;
+  } else {
+    return 0;
+  }
 
   Foswiki::Func::registerRESTHandler('webs', \&_handleRESTWebs,
     authenticate  => 1,
@@ -29,6 +33,8 @@ sub initPlugin {
     http_allow    => 'GET',
     description   => "Handler to fetch all Topics for a given web name"
   );
+
+  return 1;
 }
 
 sub updateTopicLinks {
@@ -65,7 +71,6 @@ sub rewriteLinks {
   my $renderer = $Foswiki::Plugins::SESSION->renderer;
   require Foswiki::Render;
 
-
   my $rewriteLinkOptions = {
       oldWeb => $oldLinkWeb,
       oldTopic => $oldLinkTopic,
@@ -85,7 +90,6 @@ sub rewriteLinks {
 }
 
 sub _handleRESTWebs {
-
   # $filter
   #  - 'user' == only user webs (hide hidden once, e.g. _empty)
   #  - 'public' == filter all public webs
@@ -100,13 +104,31 @@ sub _handleRESTWebTopics {
   my ( %session, undef, undef, $response ) = @_;
   my $request = Foswiki::Func::getRequestObject();
   my $web = $request->param("webname");
+  my $json = JSON->new->utf8;
 
   die unless $web;
 
   my @webTopics = ();
   if( Foswiki::Func::webExists( $web ) ) {
-    @webTopics = Foswiki::Func::getTopicList( $web );
+    my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
+    my $query = "type:topic AND web:$web";
+    my %params = (
+      rows=> 9999,
+      fl => 'web,topic,webtopic,title,preference*',
+      sort => 'title asc'
+    );
+
+    my $wikiUser = Foswiki::Func::getWikiName();
+    unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
+        push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
+    }
+
+    my $results = $solr->solrSearch($query, \%params);
+    my $content = $results->raw_response;
+    $content = $json->decode($content->{_content});
+    @webTopics = @{$content->{response}->{docs}};
   }
+
   # filter topic names and build full-qualified object
   # webTopic = { title: 'Sample Web Name', name: 'SampleWebName', web: 'Processes' }
   my @topicFilter = (
@@ -121,33 +143,24 @@ sub _handleRESTWebTopics {
       'ExtraField$'
   );
   my @filteredWebTopics = ();
-  foreach(@webTopics) {
-    my $topic = $_;
+  foreach my $topic (@webTopics) {
+    my %topic = %{$topic};
     my $isValidTopic = 1;
 
     foreach(@topicFilter) {
-      $isValidTopic &= !($topic =~ m/$_/);
+      $isValidTopic &= !($topic{topic} =~ m/$_/);
     }
 
-    if( $isValidTopic && Foswiki::Func::checkAccessPermission( "VIEW", $session{user}, undef, $topic, $web) ) {
-      my %webTopic;
-      $webTopic{name} = $topic;
-      $webTopic{web} = $web;
-
-      my ($topicMeta, $text) = Foswiki::Func::readTopic($webTopic{web}, $webTopic{name});
-
-      if( $topicMeta->getPreference('TechnicalTopic') && $topicMeta->getPreference( 'TechnicalTopic' )->{value} ) {
-        next; # skip this topic per definition
-      }
-
-      if( $topicMeta->get( 'FIELD', 'TopicTitle' ) ) {
-        $webTopic{title} = $topicMeta->get( 'FIELD', 'TopicTitle' )->{value};
-      }else{
-        $webTopic{title} = $webTopic{name};
-      }
-
-      push @filteredWebTopics, {%webTopic};
+    if( !$isValidTopic || (grep(/^TechnicalTopic$/, @{$topic{preference}}) && $topic{preference_TechnicalTopic_s} eq "1" ) ) {
+      next; # skip this topic per definition
     }
+
+    my %webTopic;
+    $webTopic{name} = $topic{topic};
+    $webTopic{web} = $web;
+    $webTopic{title} = $topic{title};
+
+    push @filteredWebTopics, {%webTopic};
   }
 
   return to_json(\@filteredWebTopics);
