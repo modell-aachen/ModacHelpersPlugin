@@ -15,6 +15,13 @@ our $SHORTDESCRIPTION = 'This plugin provides several helper functions.';
 our $NO_PREFS_IN_TOPIC = 1;
 
 sub initPlugin {
+
+  if ($Foswiki::cfg{Plugins}{SolrPlugin}{Enabled}) {
+    require Foswiki::Plugins::SolrPlugin;
+  } else {
+    return 0;
+  }
+
   Foswiki::Func::registerRESTHandler('webs', \&_handleRESTWebs,
     authenticate  => 1,
     http_allow    => 'GET',
@@ -26,6 +33,8 @@ sub initPlugin {
     http_allow    => 'GET',
     description   => "Handler to fetch all Topics for a given web name"
   );
+
+  return 1;
 }
 
 sub updateTopicLinks {
@@ -62,7 +71,6 @@ sub rewriteLinks {
   my $renderer = $Foswiki::Plugins::SESSION->renderer;
   require Foswiki::Render;
 
-
   my $rewriteLinkOptions = {
       oldWeb => $oldLinkWeb,
       oldTopic => $oldLinkTopic,
@@ -82,47 +90,110 @@ sub rewriteLinks {
 }
 
 sub _handleRESTWebs {
-
   # $filter
   #  - 'user' == only user webs (hide hidden once, e.g. _empty)
   #  - 'public' == filter all public webs
   #  - 'allowed' == exclude all webs the current user can't read
   my @webs = Foswiki::Func::getListOfWebs( "user,public,allowed" );
-  return to_json(\@webs);
+  my @invalidWebs = (
+    '^System$',
+    '^System/',
+    '^Trash$',
+    '^OUTemplate$'
+  );
+
+  my @filteredWebs = ();
+  foreach my $web (@webs) {
+    if ( _isValidItem( $web, @invalidWebs ) ) {
+      push @filteredWebs, $web;
+    }
+  }
+
+  return to_json(\@filteredWebs);
 }
+
+
 
 sub _handleRESTWebTopics {
   my ( %session, undef, undef, $response ) = @_;
   my $request = Foswiki::Func::getRequestObject();
-  my $web = $request->param("webname");
+  my @websParam = $request->multi_param("webname");
+  my $json = JSON->new->utf8;
 
-  die unless $web;
+  die unless @websParam;
+
+  # prepare web restriction query
+  my $websExist = 1;
+  my $webRestrictionQuery = "";
+  foreach my $web (@websParam) {
+    $webRestrictionQuery .= ($webRestrictionQuery ne "")?' OR ':'';
+    $websExist &= Foswiki::Func::webExists( $web );
+    last unless $websExist;
+    $webRestrictionQuery .= "web:$web";
+  }
 
   my @webTopics = ();
-  if( Foswiki::Func::webExists( $web ) ) {
-    @webTopics = Foswiki::Func::getTopicList( $web );
+  if( $websExist ) {
+    my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
+    my $query = "type:topic AND ($webRestrictionQuery)";
+    my %params = (
+      rows => 9999,
+      fl => 'web,topic,webtopic,title,preference*',
+      sort => 'title asc'
+    );
+    my $wikiUser = Foswiki::Func::getWikiName();
+    unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
+        push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
+    }
+
+    my $results = $solr->solrSearch($query, \%params);
+    my $content = $results->raw_response;
+    $content = $json->decode($content->{_content});
+    @webTopics = @{$content->{response}->{docs}};
   }
+
   # filter topic names and build full-qualified object
   # webTopic = { title: 'Sample Web Name', name: 'SampleWebName', web: 'Processes' }
+  my @invalidTopics = (
+      '^WebHome$',
+      '^WebActions$',
+      '^WebTopicList$',
+      '^WebChanges$',
+      '^WebSearch$',
+      '^WebPreferences$',
+      '^FormManager$',
+      'Template$',
+      'ExtraField$'
+  );
   my @filteredWebTopics = ();
-  foreach(@webTopics) {
-    my %webTopic;
-    $webTopic{name} = $_;
-    $webTopic{web} = $web;
+  foreach my $topic (@webTopics) {
+    my %topic = %{$topic};
+    my $isValidTopic = _isValidItem( $topic{topic}, @invalidTopics );
 
-    if( Foswiki::Func::checkAccessPermission( "VIEW", $session{user}, undef, $webTopic{name}, $webTopic{web} ) ) {
-      my ($topicMeta, $text) = Foswiki::Func::readTopic($webTopic{web}, $webTopic{name});
-      if( $topicMeta->get( 'FIELD', 'TopicTitle' ) ) {
-        $webTopic{title} = $topicMeta->get( 'FIELD', 'TopicTitle' )->{value};
-      }else{
-        $webTopic{title} = $webTopic{name};
-      }
+    if( !$isValidTopic || (grep(/^TechnicalTopic$/, @{$topic{preference}}) && $topic{preference_TechnicalTopic_s} eq "1" ) ) {
+      next; # skip this topic per definition
     }
+
+    my %webTopic;
+    $webTopic{name} = $topic{topic};
+    $webTopic{web} = $topic{web};
+    $webTopic{title} = $topic{title};
 
     push @filteredWebTopics, {%webTopic};
   }
 
   return to_json(\@filteredWebTopics);
+}
+
+sub _isValidItem() {
+  my ($item, @filterArray ) = @_;
+  my $isValid = 1;
+
+  foreach(@filterArray) {
+    $isValid &= !($item =~ m/$_/);
+  }
+
+  return $isValid;
 }
 
 1;
