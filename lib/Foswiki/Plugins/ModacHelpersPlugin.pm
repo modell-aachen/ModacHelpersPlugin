@@ -95,7 +95,21 @@ sub _handleRESTWebs {
   #  - 'public' == filter all public webs
   #  - 'allowed' == exclude all webs the current user can't read
   my @webs = Foswiki::Func::getListOfWebs( "user,public,allowed" );
-  return to_json(\@webs);
+  my @invalidWebs = (
+    '^System$',
+    '^System/',
+    '^Trash$',
+    '^OUTemplate$'
+  );
+
+  my @filteredWebs = ();
+  foreach my $web (@webs) {
+    if ( _isValidItem( $web, @invalidWebs ) ) {
+      push @filteredWebs, $web;
+    }
+  }
+
+  return to_json(\@filteredWebs);
 }
 
 
@@ -113,7 +127,7 @@ sub _handleRESTWebTopics {
     my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
     my $query = "type:topic AND web:$web";
     my %params = (
-      rows=> 9999,
+      rows => 9999,
       fl => 'web,topic,webtopic,title,preference*',
       sort => 'title asc'
     );
@@ -131,7 +145,7 @@ sub _handleRESTWebTopics {
 
   # filter topic names and build full-qualified object
   # webTopic = { title: 'Sample Web Name', name: 'SampleWebName', web: 'Processes' }
-  my @topicFilter = (
+  my @invalidTopics = (
       '^WebHome$',
       '^WebActions$',
       '^WebTopicList$',
@@ -145,11 +159,7 @@ sub _handleRESTWebTopics {
   my @filteredWebTopics = ();
   foreach my $topic (@webTopics) {
     my %topic = %{$topic};
-    my $isValidTopic = 1;
-
-    foreach(@topicFilter) {
-      $isValidTopic &= !($topic{topic} =~ m/$_/);
-    }
+    my $isValidTopic = _isValidItem( $topic{name}, @invalidTopics );
 
     if( !$isValidTopic || (grep(/^TechnicalTopic$/, @{$topic{preference}}) && $topic{preference_TechnicalTopic_s} eq "1" ) ) {
       next; # skip this topic per definition
@@ -164,6 +174,17 @@ sub _handleRESTWebTopics {
   }
 
   return to_json(\@filteredWebTopics);
+}
+
+sub _isValidItem() {
+  my ($item, @filterArray ) = @_;
+  my $isValid = 1;
+
+  foreach(@filterArray) {
+    $isValid &= !($item =~ m/$_/);
+  }
+
+  return $isValid;
 }
 
 1;
