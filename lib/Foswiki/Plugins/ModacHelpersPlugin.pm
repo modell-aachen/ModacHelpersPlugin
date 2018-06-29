@@ -141,7 +141,6 @@ sub _handleRESTWebTopics {
       fl => 'web,topic,webtopic,title,preference*',
       sort => 'title asc'
     );
-print "QUERY: $query \n\n";
     my $wikiUser = Foswiki::Func::getWikiName();
     unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
         push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
