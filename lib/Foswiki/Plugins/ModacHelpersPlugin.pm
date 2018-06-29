@@ -6,6 +6,7 @@ use warnings;
 
 use Foswiki::Plugins;
 use Foswiki::UI::Rename;
+use Foswiki::Form;
 
 our $VERSION = "1.0";
 our $RELEASE = "1.0";
@@ -63,6 +64,48 @@ sub rewriteLinks {
     $renderer->forEachLine( $topicObject->text(), \&Foswiki::UI::Rename::_replaceTopicReferences, $rewriteLinkOptions );
   $topicObject->text($text);
   $topicObject->save( minor => 1 );
+}
+
+# Returns a list of FieldDefinitions, which are mandatory, but have no value.
+# Each item is amended by a 'mapped_title' field, containing a display value.
+sub getNonSatisfiedFormFields {
+    my ($meta) = @_;
+    return () unless $meta;
+
+    my $form = $meta->get('FORM');
+    return () unless $form;
+    my $formName = $form->{name};
+    return () unless $formName;
+
+    my $formDef = new Foswiki::Form($meta->session(), $meta->web(), $formName);
+    return () unless $formDef;
+
+    my $mappings;
+
+    my @unsatisfied;
+    foreach my $field (@{$formDef->getFields}) {
+        my $metadata = $meta->get('FIELD', $field->{name});
+        next if defined $metadata && defined $metadata->{value} && $metadata->{value} ne '';
+
+        my $fieldDef = $formDef->getField($field->{name});
+        next unless $fieldDef->isMandatory();
+
+        unless(defined $mappings) {
+            Foswiki::Func::loadTemplate('DocumentFormTable');
+            my $modacformtable_mappings = Foswiki::Func::expandTemplate('modacformtable_mappings');
+            $modacformtable_mappings = Foswiki::Func::expandCommonVariables($modacformtable_mappings);
+            $modacformtable_mappings =~ s#^\s+##;
+            $modacformtable_mappings =~ s#\s+$##;
+            my @parts = split(/\s*,\s*/, $modacformtable_mappings);
+            $mappings = { map{ split(/=/, $_, 2) } @parts };
+        }
+
+        $fieldDef->{mapped_title} = $mappings->{$field->{name}};
+        $fieldDef->{mapped_title} = $field->{name} unless defined $fieldDef->{mapped_title} && $fieldDef->{mapped_title} ne '';
+
+        push @unsatisfied, $fieldDef;
+    }
+    return @unsatisfied;
 }
 
 1;
