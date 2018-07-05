@@ -25,12 +25,14 @@ sub initPlugin {
 
   Foswiki::Func::registerRESTHandler('webs', \&_handleRESTWebs,
     authenticate  => 1,
+    validate => 0,
     http_allow    => 'GET',
     description   => "Handler to fetch all Web's for current user"
   );
 
   Foswiki::Func::registerRESTHandler('topics', \&_handleRESTWebTopics,
     authenticate  => 1,
+    validate => 0,
     http_allow    => 'GET',
     description   => "Handler to fetch all Topics for a given web name"
   );
