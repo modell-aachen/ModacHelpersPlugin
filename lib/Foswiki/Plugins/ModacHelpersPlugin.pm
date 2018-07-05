@@ -94,7 +94,7 @@ sub rewriteLinks {
 
 sub _handleRESTWebs {
   # $filter
-  #  - 'user' == only user webs (hide hidden once, e.g. _empty)
+  #  - 'user' == only user webs (hide hidden ones, e.g. _empty)
   #  - 'public' == filter all public webs
   #  - 'allowed' == exclude all webs the current user can't read
   my @webs = Foswiki::Func::getListOfWebs( "user,public,allowed" );
@@ -105,53 +105,44 @@ sub _handleRESTWebs {
     '^OUTemplate$'
   );
 
-  my @filteredWebs = ();
-  foreach my $web (@webs) {
-    if ( _isValidItem( $web, @invalidWebs ) ) {
-      push @filteredWebs, $web;
-    }
-  }
+  my @filteredWebs = grep{ _isValidItem($_, @invalidWebs) } @webs;
 
   return to_json(\@filteredWebs);
 }
 
 sub _handleRESTWebTopics {
-  my ( %session, undef, undef, $response ) = @_;
   my $request = Foswiki::Func::getRequestObject();
   my @websParam = $request->multi_param("webname");
+  my $rowsParam = $request->param("rows") || 9999;
   my $json = JSON->new->utf8;
 
   die unless @websParam;
-
+  @websParam = grep{ Foswiki::Func::isValidWebName($_) } @websParam;
   # prepare web restriction query
-  my $websExist = 1;
   my $webRestrictionQuery = "";
   foreach my $web (@websParam) {
     $webRestrictionQuery .= ($webRestrictionQuery ne "")?' OR ':'';
-    $websExist &= Foswiki::Func::webExists( $web );
-    last unless $websExist;
     $webRestrictionQuery .= "web:$web";
   }
 
   my @webTopics = ();
-  if( $websExist ) {
-    my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
-    my $query = "type:topic AND ($webRestrictionQuery)";
-    my %params = (
-      rows => 9999,
-      fl => 'web,topic,webtopic,title,preference*',
-      sort => 'title asc'
-    );
-    my $wikiUser = Foswiki::Func::getWikiName();
-    unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
-        push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
-    }
-
-    my $results = $solr->solrSearch($query, \%params);
-    my $content = $results->raw_response;
-    $content = $json->decode($content->{_content});
-    @webTopics = @{$content->{response}->{docs}};
+  my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
+  my $query = "type:topic AND ($webRestrictionQuery)";
+  my %params = (
+    rows => $rowsParam,
+    fl => 'web,topic,webtopic,title,preference*',
+    sort => 'title asc'
+  );
+  my $wikiUser = Foswiki::Func::getWikiName();
+  unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
+      push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
   }
+
+  my $results = $solr->solrSearch($query, \%params);
+  my $content = $results->raw_response;
+  $content = $json->decode($content->{_content});
+  @webTopics = @{$content->{response}->{docs}};
+
 
   # filter topic names and build full-qualified object
   # webTopic = { title: 'Sample Web Name', name: 'SampleWebName', web: 'Processes' }
