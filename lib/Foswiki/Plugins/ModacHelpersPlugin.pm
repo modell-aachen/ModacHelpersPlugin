@@ -105,8 +105,12 @@ sub _handleRESTWebs {
     '^OUTemplate$'
   );
 
-  my @filteredWebs = grep{ _isValidItem($_, @invalidWebs) } @webs;
-
+  my @filteredWebs;
+  foreach my $web (@webs) {
+    if( _isValidItem($web, @invalidWebs)  ) {
+      push @filteredWebs, { id => $web, title => $web };
+    }
+  }
   return to_json(\@filteredWebs);
 }
 
@@ -142,7 +146,6 @@ sub _handleRESTWebTopics {
   my $content = $results->raw_response;
   $content = $json->decode($content->{_content});
   @webTopics = @{$content->{response}->{docs}};
-
 
   # filter topic names and build full-qualified object
   # webTopic = { title: 'Sample Web Name', name: 'SampleWebName', web: 'Processes' }
