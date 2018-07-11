@@ -108,19 +108,23 @@ sub _handleRESTWebs {
   my @filteredWebs;
   foreach my $web (@webs) {
     if( _isValidItem($web, @invalidWebs)  ) {
-      push @filteredWebs, { id => $web, title => $web };
+      push @filteredWebs, { id => $web, text => $web };
     }
   }
-  return to_json(\@filteredWebs);
+  return to_json({results => \@filteredWebs});
 }
 
 sub _handleRESTWebTopics {
   my $request = Foswiki::Func::getRequestObject();
-  my @websParam = $request->multi_param("webname");
-  my $rowsParam = $request->param("rows") || 9999;
+  my @websParam = $request->multi_param("web");
+  my $limit = $request->param("limit") || 10;
+  my $page = $request->param("page") || 0;
+  my $term = $request->param("term");
   my $json = JSON->new->utf8;
-
-  die unless @websParam;
+  # if only one element is given try to split by comma
+  if( scalar @websParam == 1 ) {
+    @websParam = split(/,/, $websParam[0]);
+  }
   @websParam = grep{ Foswiki::Func::isValidWebName($_) } @websParam;
   # prepare web restriction query
   my $webRestrictionQuery = "";
@@ -131,9 +135,13 @@ sub _handleRESTWebTopics {
 
   my @webTopics = ();
   my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
-  my $query = "type:topic AND ($webRestrictionQuery)";
+  my $query = "type:topic";
+  $query .= " AND title:*$term*" if $term;
+  $query .= " AND ($webRestrictionQuery)" if $webRestrictionQuery;
+  Foswiki::Func::writeWarning( "My query : $query" );
   my %params = (
-    rows => $rowsParam,
+    rows => $limit,
+    start => $page * $limit,
     fl => 'web,topic,webtopic,title,preference*',
     sort => 'title asc'
   );
@@ -156,7 +164,7 @@ sub _handleRESTWebTopics {
       '^WebChanges$',
       '^WebSearch$',
       '^WebPreferences$',
-      '^FormManager$',
+      'FormManager$',
       'Template$',
       'ExtraField$'
   );
@@ -170,14 +178,14 @@ sub _handleRESTWebTopics {
     }
 
     my %webTopic;
-    $webTopic{name} = $topic{topic};
+    $webTopic{id} = $topic{topic};
     $webTopic{web} = $topic{web};
-    $webTopic{title} = $topic{title};
+    $webTopic{text} = $topic{title};
 
     push @filteredWebTopics, {%webTopic};
   }
 
-  return to_json(\@filteredWebTopics);
+  return to_json({results => \@filteredWebTopics});
 }
 
 sub _isValidItem() {
