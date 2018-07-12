@@ -176,13 +176,14 @@ sub _handleRESTWebTopics {
     '*ExtraField'
   );
   my $topicFilter = '-topic:(' .join(' OR ', @invalidTopics) .')';
+  my $technicalTopicFilter = '-preference_TechnicalTopic_s:1';
 
   my @webTopics = ();
   my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
   my $query = "type:topic";
   $query .= " AND title:*$term*" if $term;
   $query .= " AND ($webRestrictionQuery)" if $webRestrictionQuery;
-  $query .= " AND $topicFilter";
+  $query .= " AND $topicFilter AND $technicalTopicFilter";
 
   my %params = (
     "rows" => $limit,
@@ -201,17 +202,11 @@ sub _handleRESTWebTopics {
   $content = $json->decode($content->{_content});
   @webTopics = @{$content->{response}->{docs}};
 
-  # filter topic names and build full-qualified object
+  # build full-qualified object
   # webTopic = { title: 'Sample Web Name', name: 'SampleWebName', web: 'Processes' }
-
-
   my @filteredWebTopics = ();
   foreach my $topic (@webTopics) {
     my %topic = %{$topic};
-    if(grep(/^TechnicalTopic$/, @{$topic{preference}}) && $topic{preference_TechnicalTopic_s} eq "1" ) {
-      next; # skip this topic per definition
-    }
-
     my %webTopic;
     $webTopic{id} = $topic{webtopic};
     $webTopic{web} = $topic{web};
