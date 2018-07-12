@@ -9,6 +9,7 @@ use Foswiki::UI::Rename;
 use Foswiki::Form;
 use JSON;
 use Foswiki::AccessControlException;
+use Scalar::Util qw(looks_like_number);
 
 our $VERSION = "1.0";
 our $RELEASE = "1.0";
@@ -93,25 +94,55 @@ sub rewriteLinks {
 }
 
 sub _handleRESTWebs {
-  # $filter
-  #  - 'user' == only user webs (hide hidden ones, e.g. _empty)
-  #  - 'public' == filter all public webs
-  #  - 'allowed' == exclude all webs the current user can't read
-  my @webs = Foswiki::Func::getListOfWebs( "user,public,allowed" );
+
+  my $request = Foswiki::Func::getRequestObject();
+  my $limit = $request->param("limit") || 10;
+  my $page = $request->param("page") || 0;
+  my $term = $request->param("term");
+  my $json = JSON->new->utf8;
+
   my @invalidWebs = (
-    '^System$',
-    '^System/',
-    '^Trash$',
-    '^OUTemplate$'
+    'System',
+    'System.*',
+    'Trash',
+    'OUTemplate'
+  );
+  my $webFilter = '-web:(' .join(' OR ', @invalidWebs) .')';
+
+  my @webs = ();
+  my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
+  my $query = "type:topic";
+  $query .= " AND web:*$term*" if $term;
+  $query .= " AND $webFilter";
+
+  my %params = (
+    "fl" => 'web',
+    "facet" => "true",
+    "facet.field" => "web",
+    "facet.method" => "enum",
+    "facet.limit" => $limit,
+    "facet.offset" => $page * $limit,
+    "facet.sort" => "index",
+    "facet.zeros" => "false"
   );
 
-  my @filteredWebs;
-  foreach my $web (@webs) {
-    if( _isValidItem($web, @invalidWebs)  ) {
-      push @filteredWebs, { id => $web, text => $web };
-    }
+  my $wikiUser = Foswiki::Func::getWikiName();
+  unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
+      push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
   }
-  return to_json({results => \@filteredWebs});
+
+  my $results = $solr->solrSearch($query, \%params);
+  my $content = $results->raw_response;
+  $content = $json->decode($content->{_content});
+  my @webFacets = @{$content->{facet_counts}->{facet_fields}->{web}};
+
+  @webFacets = grep{ !looks_like_number($_) } @webFacets;
+
+  foreach my $web (@webFacets) {
+    push @webs, { id => $web, text => $web };
+  }
+
+  return to_json({results => \@webs});
 }
 
 sub _handleRESTWebTopics {
@@ -133,18 +164,33 @@ sub _handleRESTWebTopics {
     $webRestrictionQuery .= "web:$web";
   }
 
+  my @invalidTopics = (
+    'WebHome',
+    'WebActions',
+    'WebTopicList',
+    'WebChanges',
+    'WebSearch',
+    'WebPreferences',
+    '*FormManager',
+    '*Template',
+    '*ExtraField'
+  );
+  my $topicFilter = '-topic:(' .join(' OR ', @invalidTopics) .')';
+
   my @webTopics = ();
   my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
   my $query = "type:topic";
   $query .= " AND title:*$term*" if $term;
   $query .= " AND ($webRestrictionQuery)" if $webRestrictionQuery;
-  Foswiki::Func::writeWarning( "My query : $query" );
+  $query .= " AND $topicFilter";
+
   my %params = (
-    rows => $limit,
-    start => $page * $limit,
-    fl => 'web,topic,webtopic,title,preference*',
-    sort => 'title asc'
+    "rows" => $limit,
+    "start" => $page * $limit,
+    "fl" => 'web,topic,webtopic,title,preference*',
+    "sort" => 'title asc'
   );
+
   my $wikiUser = Foswiki::Func::getWikiName();
   unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
       push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
@@ -157,28 +203,17 @@ sub _handleRESTWebTopics {
 
   # filter topic names and build full-qualified object
   # webTopic = { title: 'Sample Web Name', name: 'SampleWebName', web: 'Processes' }
-  my @invalidTopics = (
-      '^WebHome$',
-      '^WebActions$',
-      '^WebTopicList$',
-      '^WebChanges$',
-      '^WebSearch$',
-      '^WebPreferences$',
-      'FormManager$',
-      'Template$',
-      'ExtraField$'
-  );
+
+
   my @filteredWebTopics = ();
   foreach my $topic (@webTopics) {
     my %topic = %{$topic};
-    my $isValidTopic = _isValidItem( $topic{topic}, @invalidTopics );
-
-    if( !$isValidTopic || (grep(/^TechnicalTopic$/, @{$topic{preference}}) && $topic{preference_TechnicalTopic_s} eq "1" ) ) {
+    if(grep(/^TechnicalTopic$/, @{$topic{preference}}) && $topic{preference_TechnicalTopic_s} eq "1" ) {
       next; # skip this topic per definition
     }
 
     my %webTopic;
-    $webTopic{id} = $topic{topic};
+    $webTopic{id} = $topic{webtopic};
     $webTopic{web} = $topic{web};
     $webTopic{text} = $topic{title};
 
@@ -186,17 +221,6 @@ sub _handleRESTWebTopics {
   }
 
   return to_json({results => \@filteredWebTopics});
-}
-
-sub _isValidItem() {
-  my ($item, @filterArray ) = @_;
-  my $isValid = 1;
-
-  foreach(@filterArray) {
-    $isValid &= !($item =~ m/$_/);
-  }
-
-  return $isValid;
 }
 
 # Returns a list of FieldDefinitions, which are mandatory, but have no value.
