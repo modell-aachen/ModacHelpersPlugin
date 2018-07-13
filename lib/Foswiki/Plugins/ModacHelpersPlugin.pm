@@ -134,9 +134,8 @@ sub _handleRESTWebs {
   my $results = $solr->solrSearch($query, \%params);
   my $content = $results->raw_response;
   $content = $json->decode($content->{_content});
-  my @webFacets = @{$content->{facet_counts}->{facet_fields}->{web}};
-
-  @webFacets = grep{ !looks_like_number($_) } @webFacets;
+  my %webHash = @{$content->{facet_counts}->{facet_fields}->{web}};
+  my @webFacets = keys %webHash;
 
   foreach my $web (@webFacets) {
     push @webs, { id => $web, text => $web };
