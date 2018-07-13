@@ -7,11 +7,39 @@ use warnings;
 use Foswiki::Plugins;
 use Foswiki::UI::Rename;
 use Foswiki::Form;
+use JSON;
+use Foswiki::AccessControlException;
+use Scalar::Util qw(looks_like_number);
 
 our $VERSION = "1.0";
 our $RELEASE = "1.0";
 our $SHORTDESCRIPTION = 'This plugin provides several helper functions.';
 our $NO_PREFS_IN_TOPIC = 1;
+
+sub initPlugin {
+
+  if ($Foswiki::cfg{Plugins}{SolrPlugin}{Enabled}) {
+    require Foswiki::Plugins::SolrPlugin;
+  } else {
+    return 0;
+  }
+
+  Foswiki::Func::registerRESTHandler('webs', \&_handleRESTWebs,
+    authenticate  => 1,
+    validate => 0,
+    http_allow    => 'GET',
+    description   => "Handler to fetch all Web's for current user"
+  );
+
+  Foswiki::Func::registerRESTHandler('topics', \&_handleRESTWebTopics,
+    authenticate  => 1,
+    validate => 0,
+    http_allow    => 'GET',
+    description   => "Handler to fetch all Topics for a given web name"
+  );
+
+  return 1;
+}
 
 sub updateTopicLinks {
   my ($oldWeb, $oldTopic, $newWeb, $newTopic) = @_;
@@ -47,7 +75,6 @@ sub rewriteLinks {
   my $renderer = $Foswiki::Plugins::SESSION->renderer;
   require Foswiki::Render;
 
-
   my $rewriteLinkOptions = {
       oldWeb => $oldLinkWeb,
       oldTopic => $oldLinkTopic,
@@ -64,6 +91,130 @@ sub rewriteLinks {
     $renderer->forEachLine( $topicObject->text(), \&Foswiki::UI::Rename::_replaceTopicReferences, $rewriteLinkOptions );
   $topicObject->text($text);
   $topicObject->save( minor => 1 );
+}
+
+sub _handleRESTWebs {
+
+  my $request = Foswiki::Func::getRequestObject();
+  my $limit = $request->param("limit") || 10;
+  my $page = $request->param("page") || 0;
+  my $term = $request->param("term");
+  my $json = JSON->new->utf8;
+
+  my @invalidWebs = (
+    'System',
+    'System.*',
+    'Trash',
+    'OUTemplate'
+  );
+  my $webFilter = '-web:(' .join(' OR ', @invalidWebs) .')';
+
+  my @webs = ();
+  my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
+  my $query = "type:topic";
+  $query .= " AND web:*$term*" if $term;
+  $query .= " AND $webFilter";
+
+  my %params = (
+    "fl" => 'web',
+    "facet" => "true",
+    "facet.field" => "web",
+    "facet.method" => "enum",
+    "facet.limit" => $limit,
+    "facet.offset" => $page * $limit,
+    "facet.sort" => "index",
+    "facet.zeros" => "false"
+  );
+
+  my $wikiUser = Foswiki::Func::getWikiName();
+  unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
+      push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
+  }
+
+  my $results = $solr->solrSearch($query, \%params);
+  my $content = $results->raw_response;
+  $content = $json->decode($content->{_content});
+  my %webHash = @{$content->{facet_counts}->{facet_fields}->{web}};
+  my @webFacets = keys %webHash;
+
+  foreach my $web (@webFacets) {
+    push @webs, { id => $web, text => $web };
+  }
+
+  return to_json({results => \@webs});
+}
+
+sub _handleRESTWebTopics {
+  my $request = Foswiki::Func::getRequestObject();
+  my @websParam = $request->multi_param("web");
+  my $limit = $request->param("limit") || 10;
+  my $page = $request->param("page") || 0;
+  my $term = $request->param("term");
+  my $json = JSON->new->utf8;
+  # if only one element is given try to split by comma
+  if( scalar @websParam == 1 ) {
+    @websParam = split(/,/, $websParam[0]);
+  }
+  @websParam = grep{ Foswiki::Func::isValidWebName($_) } @websParam;
+  # prepare web restriction query
+  my $webRestrictionQuery = "";
+  foreach my $web (@websParam) {
+    $webRestrictionQuery .= ($webRestrictionQuery ne "")?' OR ':'';
+    $webRestrictionQuery .= "web:$web";
+  }
+
+  my @invalidTopics = (
+    'WebHome',
+    'WebActions',
+    'WebTopicList',
+    'WebChanges',
+    'WebSearch',
+    'WebPreferences',
+    '*FormManager',
+    '*Template',
+    '*ExtraField'
+  );
+  my $topicFilter = '-topic:(' .join(' OR ', @invalidTopics) .')';
+  my $technicalTopicFilter = '-preference_TechnicalTopic_s:1';
+
+  my @webTopics = ();
+  my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
+  my $query = "type:topic";
+  $query .= " AND title:*$term*" if $term;
+  $query .= " AND ($webRestrictionQuery)" if $webRestrictionQuery;
+  $query .= " AND $topicFilter AND $technicalTopicFilter";
+
+  my %params = (
+    "rows" => $limit,
+    "start" => $page * $limit,
+    "fl" => 'web,topic,webtopic,title,preference*',
+    "sort" => 'title asc'
+  );
+
+  my $wikiUser = Foswiki::Func::getWikiName();
+  unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
+      push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
+  }
+
+  my $results = $solr->solrSearch($query, \%params);
+  my $content = $results->raw_response;
+  $content = $json->decode($content->{_content});
+  @webTopics = @{$content->{response}->{docs}};
+
+  # build full-qualified object
+  # webTopic = { title: 'Sample Web Name', name: 'SampleWebName', web: 'Processes' }
+  my @filteredWebTopics = ();
+  foreach my $topic (@webTopics) {
+    my %topic = %{$topic};
+    my %webTopic;
+    $webTopic{id} = $topic{webtopic};
+    $webTopic{web} = $topic{web};
+    $webTopic{text} = $topic{title};
+
+    push @filteredWebTopics, {%webTopic};
+  }
+
+  return to_json({results => \@filteredWebTopics});
 }
 
 # Returns a list of FieldDefinitions, which are mandatory, but have no value.
