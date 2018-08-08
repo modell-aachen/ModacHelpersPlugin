@@ -244,6 +244,7 @@ sub getNonSatisfiedFormFields {
         $mappings = getDocumentFormTableMappings() unless defined $mappings;
 
         $fieldDef->{mapped_title} = $mappings->{$field->{name}};
+        $fieldDef->{mapped_title} = $field->{description} unless defined $fieldDef->{mapped_title} && $fieldDef->{mapped_title} ne '';
         $fieldDef->{mapped_title} = $field->{name} unless defined $fieldDef->{mapped_title} && $fieldDef->{mapped_title} ne '';
 
         push @unsatisfied, $fieldDef;
