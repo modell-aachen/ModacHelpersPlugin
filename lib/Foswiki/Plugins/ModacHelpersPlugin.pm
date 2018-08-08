@@ -94,6 +94,7 @@ sub rewriteLinks {
 }
 
 sub _handleRESTWebs {
+  my ( $session ) = @_;
 
   my $request = Foswiki::Func::getRequestObject();
   my $limit = $request->param("limit") || 10;
@@ -101,13 +102,10 @@ sub _handleRESTWebs {
   my $term = $request->param("term");
   my $json = JSON->new->utf8;
 
-  my @invalidWebs = (
-    'System',
-    'System.*',
-    'Trash',
-    'OUTemplate'
-  );
-  my $webFilter = '-web:(' .join(' OR ', @invalidWebs) .')';
+  my $meta = Foswiki::Meta->new($session);
+  my @hideWebs = _getHideWebs($meta);
+  push @hideWebs, 'System*';
+  my $webFilter = '-web:(' .join(' OR ', @hideWebs) .')';
 
   my @webs = ();
   my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
@@ -137,11 +135,27 @@ sub _handleRESTWebs {
   my %webHash = @{$content->{facet_counts}->{facet_fields}->{web}};
   my @webFacets = keys %webHash;
 
-  foreach my $web (@webFacets) {
-    push @webs, { id => $web, text => $web };
+  my %webMap = _getWebMapping($meta, \@webFacets);
+  foreach my $web (sort @webFacets) {
+    push @webs, { id => $web, text => $webMap{$web} || $web};
   }
 
   return to_json({results => \@webs});
+}
+
+sub _getHideWebs {
+  my ($meta) = @_;
+  my $hideWebsPref = $meta->expandMacros("%MODAC_HIDEWEBS%");
+  my @hideWebs = split(/\|/,$hideWebsPref);
+  return @hideWebs;
+}
+
+sub _getWebMapping {
+  my ($meta, $webFacets) = @_;
+
+  my $webMappginPref = $meta->expandMacros("%MODAC_WEBMAPPINGS{default=\"\"}%");
+  my %webMap = map {$_ =~ /^(.*)=(.*)$/, $1=>$2} split(/\s*,\s*/, $webMappginPref);
+  return %webMap;
 }
 
 sub _handleRESTWebTopics {
