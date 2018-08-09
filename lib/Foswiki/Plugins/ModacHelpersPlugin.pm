@@ -104,7 +104,6 @@ sub _handleRESTWebs {
 
   my $meta = Foswiki::Meta->new($session);
   my @hideWebs = _getHideWebs($meta);
-  push @hideWebs, 'System*';
   my $webFilter = '-web:(' .join(' OR ', @hideWebs) .')';
 
   my @webs = ();
