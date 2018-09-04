@@ -158,6 +158,8 @@ sub _getWebMapping {
 }
 
 sub _handleRESTWebTopics {
+  my ( $session ) = @_;
+
   my $request = Foswiki::Func::getRequestObject();
   my @websParam = $request->multi_param("web");
   my $limit = $request->param("limit") || 10;
@@ -175,6 +177,10 @@ sub _handleRESTWebTopics {
     $webRestrictionQuery .= ($webRestrictionQuery ne "")?' OR ':'';
     $webRestrictionQuery .= "web:$web";
   }
+
+  my $meta = Foswiki::Meta->new($session);
+  my @hideWebs = _getHideWebs($meta);
+  my $webFilter = '-web:(' .join(' OR ', @hideWebs) .')';
 
   my @invalidTopics = (
     'WebHome',
@@ -195,6 +201,7 @@ sub _handleRESTWebTopics {
   my $query = "type:topic";
   $query .= " AND title:*$term*" if $term;
   $query .= " AND ($webRestrictionQuery)" if $webRestrictionQuery;
+  $query .= " AND ($webFilter)" if $webFilter;
   $query .= " AND $topicFilter AND $technicalTopicFilter";
 
   my %params = (
