@@ -173,14 +173,11 @@ sub _handleRESTWebTopics {
   @websParam = grep{ Foswiki::Func::isValidWebName($_) } @websParam;
   # prepare web restriction query
   my $webRestrictionQuery = "";
-  foreach my $web (@websParam) {
-    $webRestrictionQuery .= ($webRestrictionQuery ne "")?' OR ':'';
-    $webRestrictionQuery .= "web:$web";
-  }
+  $webRestrictionQuery = 'web:(' .join(' OR ', @websParam) .')' if scalar @websParam > 0;
 
   my $meta = Foswiki::Meta->new($session);
   my @hideWebs = _getHideWebs($meta);
-  my $webFilter = '-web:(' .join(' OR ', @hideWebs) .')';
+  my $webFilter = '-web:(' .join(' OR ', @hideWebs) .')' if scalar @hideWebs > 0;
 
   my @invalidTopics = (
     'WebHome',
@@ -191,7 +188,8 @@ sub _handleRESTWebTopics {
     'WebPreferences',
     '*FormManager',
     '*Template',
-    '*ExtraField'
+    '*ExtraField',
+    'AllTasks'
   );
   my $topicFilter = '-topic:(' .join(' OR ', @invalidTopics) .')';
   my $technicalTopicFilter = '-preference_TechnicalTopic_s:1';
@@ -200,8 +198,8 @@ sub _handleRESTWebTopics {
   my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
   my $query = "type:topic";
   $query .= " AND title:*$term*" if $term;
-  $query .= " AND ($webRestrictionQuery)" if $webRestrictionQuery;
-  $query .= " AND ($webFilter)" if $webFilter;
+  $query .= " AND $webRestrictionQuery" if $webRestrictionQuery;
+  $query .= " AND $webFilter" if $webFilter;
   $query .= " AND $topicFilter AND $technicalTopicFilter";
 
   my %params = (
