@@ -158,6 +158,8 @@ sub _getWebMapping {
 }
 
 sub _handleRESTWebTopics {
+  my ( $session ) = @_;
+
   my $request = Foswiki::Func::getRequestObject();
   my @websParam = $request->multi_param("web");
   my $limit = $request->param("limit") || 10;
@@ -171,10 +173,11 @@ sub _handleRESTWebTopics {
   @websParam = grep{ Foswiki::Func::isValidWebName($_) } @websParam;
   # prepare web restriction query
   my $webRestrictionQuery = "";
-  foreach my $web (@websParam) {
-    $webRestrictionQuery .= ($webRestrictionQuery ne "")?' OR ':'';
-    $webRestrictionQuery .= "web:$web";
-  }
+  $webRestrictionQuery = 'web:(' .join(' OR ', @websParam) .')' if scalar @websParam > 0;
+
+  my $meta = Foswiki::Meta->new($session);
+  my @hideWebs = _getHideWebs($meta);
+  my $webFilter = '-web:(' .join(' OR ', @hideWebs) .')' if scalar @hideWebs > 0;
 
   my @invalidTopics = (
     'WebHome',
@@ -185,7 +188,8 @@ sub _handleRESTWebTopics {
     'WebPreferences',
     '*FormManager',
     '*Template',
-    '*ExtraField'
+    '*ExtraField',
+    'AllTasks'
   );
   my $topicFilter = '-topic:(' .join(' OR ', @invalidTopics) .')';
   my $technicalTopicFilter = '-preference_TechnicalTopic_s:1';
@@ -194,7 +198,8 @@ sub _handleRESTWebTopics {
   my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
   my $query = "type:topic";
   $query .= " AND title:*$term*" if $term;
-  $query .= " AND ($webRestrictionQuery)" if $webRestrictionQuery;
+  $query .= " AND $webRestrictionQuery" if $webRestrictionQuery;
+  $query .= " AND $webFilter" if $webFilter;
   $query .= " AND $topicFilter AND $technicalTopicFilter";
 
   my %params = (
@@ -273,6 +278,51 @@ sub getDocumentFormTableMappings {
     $modacformtable_mappings =~ s#\s+$##;
     my @parts = split(/\s*,\s*/, $modacformtable_mappings);
     return { map{ split(/=/, $_, 2) } @parts };
+}
+
+sub deleteWeb {
+    my ($web) = @_;
+    _deleteWebOrTopic($web, undef);
+    _deleteSolrEntriesByQuery("web: \"$web\"");
+    Foswiki::Plugins::TasksAPIPlugin::deleteAllTasksForWeb( $web );
+    _updateWebCache($web);
+}
+
+sub deleteTopic {
+    my ($webTopic) = @_;
+
+    if( $webTopic =~ m/\// ) {
+      die "webTopic: $webTopic needs to be seperated by dot (.)";
+    }
+
+    my ($web, $topic) = Foswiki::Func::normalizeWebTopicName(undef, $webTopic);
+
+    _deleteWebOrTopic($web, $topic);
+    _deleteSolrEntriesByQuery("web: \"$web\" topic: \"$topic\"");
+    Foswiki::Plugins::TasksAPIPlugin::deleteAllTasksForTopic( $webTopic );
+    _updateWebCache($web);
+}
+
+sub _updateWebCache {
+    my ($web) = @_;
+    Foswiki::Plugins::DBCachePlugin::updateCache($web);
+}
+
+sub _deleteWebOrTopic {
+    my ($normalizedWeb, $normalizedTopic)  = @_;
+    my $cuid = Foswiki::Func::getCanonicalUserID();
+    my $plainFileStore = Foswiki::Store::PlainFile->new();
+    my $meta = Foswiki::Meta->load( $Foswiki::Plugins::SESSION, $normalizedWeb, $normalizedTopic);
+
+    $plainFileStore->remove($cuid, $meta);
+    $plainFileStore->finish();
+}
+
+sub _deleteSolrEntriesByQuery {
+    my ($query) = @_;
+    my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer();
+    $indexer->deleteByQuery( $query );
+    $indexer->commit(1);
 }
 
 1;
