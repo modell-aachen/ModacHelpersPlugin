@@ -38,6 +38,13 @@ sub initPlugin {
     description   => "Handler to fetch all Topics for a given web name"
   );
 
+  Foswiki::Func::registerRESTHandler('moveTopicToTrash', \&_handleRESTmoveTopicToTrash,
+    authenticate  => 1,
+    validate => 0,
+    http_allow    => 'POST',
+    description   => "Handler to move a topic to trash"
+  );
+
   return 1;
 }
 
@@ -323,6 +330,14 @@ sub _deleteSolrEntriesByQuery {
     my $indexer = Foswiki::Plugins::SolrPlugin::getIndexer();
     $indexer->deleteByQuery( $query );
     $indexer->commit(1);
+}
+
+sub _handleRESTmoveTopicToTrash {
+  my $request = Foswiki::Func::getRequestObject();
+  my $topicId = $request->param("topicId");
+
+  my ($web, $topic) = Foswiki::Func::normalizeWebTopicName("", $topicId);
+  Foswiki::Func::moveTopic($web, $topic, $Foswiki::cfg{TrashWebName}, $topic.time());
 }
 
 1;
