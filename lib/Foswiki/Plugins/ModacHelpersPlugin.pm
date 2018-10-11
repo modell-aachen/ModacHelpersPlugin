@@ -172,6 +172,7 @@ sub _handleRESTWebTopics {
   my $limit = $request->param("limit") || 10;
   my $page = $request->param("page") || 0;
   my $term = $request->param("term");
+  my $caseSensitive = Foswiki::Func::isTrue($request->param("case_sensitive"));
   my $json = JSON->new->utf8;
   # if only one element is given try to split by comma
   if( scalar @websParam == 1 ) {
@@ -201,10 +202,23 @@ sub _handleRESTWebTopics {
   my $topicFilter = '-topic:(' .join(' OR ', @invalidTopics) .')';
   my $technicalTopicFilter = '-preference_TechnicalTopic_s:1';
 
+  my $termQuery;
+  if($term) {
+      my @terms = split(/\s+/, $term || '');
+      my $terms = join(' AND ', map{"*$_*"} @terms);
+      my @termQueryParts = (
+          'title' . ($caseSensitive ? '' : '_search') . ":($terms)",
+          "title:\"term\"",
+          'topic' . ($caseSensitive ? '' : '_search') . ":($terms)",
+          "topic:\"term\"",
+      );
+      $termQuery = '(' . join(' OR ', @termQueryParts) . ')';
+  }
+
   my @webTopics = ();
   my $solr = Foswiki::Plugins::SolrPlugin->getSearcher();
   my $query = "type:topic";
-  $query .= " AND title:*$term*" if $term;
+  $query .= " AND $termQuery" if $termQuery;
   $query .= " AND $webRestrictionQuery" if $webRestrictionQuery;
   $query .= " AND $webFilter" if $webFilter;
   $query .= " AND $topicFilter AND $technicalTopicFilter";
