@@ -176,14 +176,14 @@ sub _handleRESTloadHistoryVersion {
 
   my $query = Foswiki::Func::getCgiQuery();
   my $webtopic = $query->param('topic');
-  my $version = $query->param('version');
+  my $revision = $query->param('revision');
   my ($web, $topic) = Foswiki::Func::normalizeWebTopicName("", $webtopic);
   my $wfappId = Foswiki::Func::getPreferencesValue("WORKFLOWAPP_ID",$web);
   my $historyUrl;
   if($wfappId) {
-      $historyUrl = Foswiki::Func::getScriptUrl($Foswiki::cfg{SystemWebName}, 'WorkflowAppOverview', 'view')."#/history/$wfappId/$topic/$version";
+      $historyUrl = Foswiki::Func::getScriptUrl($Foswiki::cfg{SystemWebName}, 'WorkflowAppOverview', 'view')."#/history/$wfappId/$webtopic/$revision";
   } else {
-      $historyUrl = Foswiki::Func::getScriptUrl($web, $topic, 'view', 'rev' => $version)
+      $historyUrl = Foswiki::Func::getScriptUrl($web, $topic, 'view', 'rev' => $revision)
   }
   return to_json({url => $historyUrl});
 }
