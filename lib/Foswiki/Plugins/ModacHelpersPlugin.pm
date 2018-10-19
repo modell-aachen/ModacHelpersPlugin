@@ -348,6 +348,17 @@ sub deleteTopic {
     _updateWebCache($web);
 }
 
+sub getTempWebName {
+    return Foswiki::Func::getPreferencesValue('MODAC_TEMPWEB');
+}
+
+sub generateTemporaryWeb {
+    my $tempWebName = getTempWebName();
+    if( ! Foswiki::Func::webExists( $tempWebName ) ) {
+        Foswiki::Func::createWeb( $tempWebName );
+    }
+}
+
 sub _updateWebCache {
     my ($web) = @_;
     Foswiki::Plugins::DBCachePlugin::updateCache($web);
