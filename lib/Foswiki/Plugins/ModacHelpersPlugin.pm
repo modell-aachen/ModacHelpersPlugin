@@ -359,6 +359,15 @@ sub generateTemporaryWeb {
     }
 }
 
+sub makeValidWikiWord {
+    my ($text) = @_;
+    return $text unless $text;
+    $text =~ s/[^a-zA-Z0-9]//g;
+    $text =~ s/^\d+//g;
+    $text =~ s/\b(\w)/uc($1)/ge;
+    return $text;
+}
+
 sub _updateWebCache {
     my ($web) = @_;
     Foswiki::Plugins::DBCachePlugin::updateCache($web);
