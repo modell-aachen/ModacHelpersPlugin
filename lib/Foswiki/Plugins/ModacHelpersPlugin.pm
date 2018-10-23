@@ -45,6 +45,13 @@ sub initPlugin {
     description   => "Handler to move a topic to trash"
   );
 
+  Foswiki::Func::registerRESTHandler('loadHistoryVersion', \&_handleRESTloadHistoryVersion,
+    authenticate  => 1,
+    validate => 0,
+    http_allow    => 'GET',
+    description   => "Handler to get a Topic in a specific Verison"
+  );
+
   return 1;
 }
 
@@ -162,6 +169,23 @@ sub _getWebMapping {
   my $webMappginPref = $meta->expandMacros("%MODAC_WEBMAPPINGS{default=\"\"}%");
   my %webMap = map {$_ =~ /^(.*)=(.*)$/, $1=>$2} split(/\s*,\s*/, $webMappginPref);
   return %webMap;
+}
+
+sub _handleRESTloadHistoryVersion {
+  my ( $session, undef, undef, $response ) = @_;
+
+  my $query = Foswiki::Func::getCgiQuery();
+  my $webtopic = $query->param('topic');
+  my $revision = $query->param('revision');
+  my ($web, $topic) = Foswiki::Func::normalizeWebTopicName("", $webtopic);
+  my $wfappId = Foswiki::Func::getPreferencesValue("WORKFLOWAPP_ID",$web);
+  my $historyUrl;
+  if($wfappId) {
+      $historyUrl = Foswiki::Func::getScriptUrl($Foswiki::cfg{SystemWebName}, 'WorkflowAppOverview', 'view')."#/history/$wfappId/$webtopic/$revision";
+  } else {
+      $historyUrl = Foswiki::Func::getScriptUrl($web, $topic, 'view', 'rev' => $revision)
+  }
+  return to_json({url => $historyUrl});
 }
 
 sub _handleRESTWebTopics {
@@ -322,6 +346,26 @@ sub deleteTopic {
     _deleteSolrEntriesByQuery("web: \"$web\" topic: \"$topic\"");
     Foswiki::Plugins::TasksAPIPlugin::deleteAllTasksForTopic( $webTopic );
     _updateWebCache($web);
+}
+
+sub getTempWebName {
+    return Foswiki::Func::getPreferencesValue('MODAC_TEMPWEB');
+}
+
+sub generateTemporaryWeb {
+    my $tempWebName = getTempWebName();
+    if( ! Foswiki::Func::webExists( $tempWebName ) ) {
+        Foswiki::Func::createWeb( $tempWebName );
+    }
+}
+
+sub makeValidWikiWord {
+    my ($text) = @_;
+    return $text unless $text;
+    $text =~ s/[^a-zA-Z0-9]//g;
+    $text =~ s/^\d+//g;
+    $text =~ s/\b(\w)/uc($1)/ge;
+    return $text;
 }
 
 sub _updateWebCache {
