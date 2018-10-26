@@ -349,14 +349,14 @@ sub deleteTopic {
 }
 
 sub getTempWebName {
-    return Foswiki::Func::getPreferencesValue('MODAC_TEMPWEB');
-}
-
-sub generateTemporaryWeb {
-    my $tempWebName = getTempWebName();
+    my $tempWebName = Foswiki::Func::getPreferencesValue('MODAC_TEMPWEB');
+    if(! $tempWebName) {
+        die "Modac temp web is not defined";
+    }
     if( ! Foswiki::Func::webExists( $tempWebName ) ) {
         Foswiki::Func::createWeb( $tempWebName );
     }
+    return $tempWebName;
 }
 
 sub makeValidWikiWord {
