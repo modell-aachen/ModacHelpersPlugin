@@ -137,10 +137,7 @@ sub _handleRESTWebs {
     "facet.zeros" => "false"
   );
 
-  my $wikiUser = Foswiki::Func::getWikiName();
-  unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
-      push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
-  }
+  push @{$params{fq}}, $solr->getACLFilters();
 
   my $results = $solr->solrSearch($query, \%params);
   my $content = $results->raw_response;
@@ -254,10 +251,7 @@ sub _handleRESTWebTopics {
     "sort" => 'title asc'
   );
 
-  my $wikiUser = Foswiki::Func::getWikiName();
-  unless (Foswiki::Func::isAnAdmin($wikiUser)) { # add ACLs
-      push @{$params{fq}}, " (access_granted:$wikiUser OR access_granted:all)"
-  }
+  push @{$params{fq}}, $solr->getACLFilters();
 
   my $results = $solr->solrSearch($query, \%params);
   my $content = $results->raw_response;
