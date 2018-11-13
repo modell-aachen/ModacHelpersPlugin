@@ -349,6 +349,9 @@ sub getTempWebName {
     }
     if( ! Foswiki::Func::webExists( $tempWebName ) ) {
         Foswiki::Func::createWeb( $tempWebName );
+        my ($meta, $text) = Foswiki::Func::readTopic($tempWebName, "WebPreferences");
+        $text .= "\n   * Set ALLOWWEBCHANGE = AdminGroup\n";
+        Foswiki::Func::saveTopic($tempWebName, "WebPreferences", $meta, $text);
     }
     return $tempWebName;
 }
