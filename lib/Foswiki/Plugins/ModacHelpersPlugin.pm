@@ -16,6 +16,10 @@ our $RELEASE = "1.0";
 our $SHORTDESCRIPTION = 'This plugin provides several helper functions.';
 our $NO_PREFS_IN_TOPIC = 1;
 
+our $SITEPREFS = {
+    MODAC_TEMPWEB => 'ModacTesting',
+};
+
 sub initPlugin {
 
   if ($Foswiki::cfg{Plugins}{SolrPlugin}{Enabled}) {
