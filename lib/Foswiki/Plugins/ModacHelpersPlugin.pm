@@ -194,10 +194,12 @@ sub _handleRESTWebTopics {
 
   my $request = Foswiki::Func::getRequestObject();
   my @websParam = $request->multi_param("web");
+  my @websFilterParam = $request->multi_param("web_filter");
   my $limit = $request->param("limit") || 10;
   my $page = $request->param("page") || 0;
   my $term = $request->param("term");
   my $caseSensitive = Foswiki::Func::isTrue($request->param("case_sensitive"));
+  my $noDiscussions = Foswiki::Func::isTrue($request->param("no_discussions"));
   my $json = JSON->new->utf8;
   # if only one element is given try to split by comma
   if( scalar @websParam == 1 ) {
@@ -208,9 +210,15 @@ sub _handleRESTWebTopics {
   my $webRestrictionQuery = "";
   $webRestrictionQuery = 'web:(' .join(' OR ', @websParam) .')' if scalar @websParam > 0;
 
-  my $meta = Foswiki::Meta->new($session);
-  my @hideWebs = _getHideWebs($meta);
-  my $webFilter = '-web:(' .join(' OR ', @hideWebs) .')' if scalar @hideWebs > 0;
+  my $webFilter;
+  my @hideWebs;
+  if(scalar @websFilterParam) {
+      @hideWebs = grep{ Foswiki::Func::isValidWebName($_) } @websFilterParam;
+  } else {
+      my $meta = Foswiki::Meta->new($session);
+      @hideWebs = _getHideWebs($meta);
+  }
+  $webFilter = '-web:(' .join(' OR ', @hideWebs) .')' if scalar @hideWebs > 0;
 
   my @invalidTopics = (
     'WebHome',
@@ -229,14 +237,27 @@ sub _handleRESTWebTopics {
 
   my $termQuery;
   if($term) {
-      my @terms = split(/\s+/, $term || '');
-      my $terms = join(' AND ', map{"*$_*"} @terms);
+      my @terms = split(/\s+|\//, $term); # Slashes cause a lot of trouble, since they indicate a regex. Thus they must be escaped with quotes, however, since they will be filtered anyway it is simpler to just nil them.
+      @terms = map{ $_ =~ s#([][\\+-:!(){}^~*?"&|])#\\$1#gr } @terms;
+      @terms = map{ $_ =~ m#/# ? "\"$_\"" : $_ } @terms;
+      my $termsRegular = join(' AND ', @terms);
+      $termsRegular = "($termsRegular)" if scalar @terms > 1;
+      my $termsAsterisk = join(' AND ', map{ "(*$_* OR $_)" } @terms);
+      $termsAsterisk = "($termsAsterisk)" if scalar @terms > 1;
+
+      Foswiki::Func::writeWarning("termsRegular $termsRegular  term $term");
       my @termQueryParts = (
-          'title' . ($caseSensitive ? '' : '_search') . ":($terms)",
-          "title:\"term\"",
-          'topic' . ($caseSensitive ? '' : '_search') . ":($terms)",
-          "topic:\"term\"",
+          'title' . ($caseSensitive ? '' : '_search') . ":$termsRegular",
+          "title:\"$term\"",
+          "title_ngram_search:\"$term\"",
+          'topic' . ($caseSensitive ? '' : '_search') . ":$termsAsterisk",
+          "topic:\"$term\"",
+          'webtopic' . ($caseSensitive ? '' : '_search') . ":$termsAsterisk",
+          "webtopic:\"$term\"",
       );
+      if($caseSensitive) {
+          push @termQueryParts, "title_ngram_search:\"$term\"",
+      }
       $termQuery = '(' . join(' OR ', @termQueryParts) . ')';
   }
 
@@ -247,6 +268,10 @@ sub _handleRESTWebTopics {
   $query .= " AND $webRestrictionQuery" if $webRestrictionQuery;
   $query .= " AND $webFilter" if $webFilter;
   $query .= " AND $topicFilter AND $technicalTopicFilter";
+  if($noDiscussions) {
+      my $suffix = Foswiki::Func::expandCommonVariables("%WORKFLOWSUFFIX%");
+      $query .= " AND -topic:*$suffix";
+  }
 
   my %params = (
     "rows" => $limit,
