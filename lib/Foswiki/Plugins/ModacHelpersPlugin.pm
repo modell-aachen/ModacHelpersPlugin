@@ -237,7 +237,7 @@ sub _handleRESTWebTopics {
 
   my $termQuery;
   if($term) {
-      my @terms = split(/\s+|\//, $term); # Slashes cause a lot of trouble, since they indicate a regex. Thus they must be escaped with quotes, however, since they will be filtered anyway it is simpler to just nil them.
+      my @terms = split(/(?:\s|\/)+/, $term); # Slashes cause a lot of trouble, since they indicate a regex. Thus they must be escaped with quotes, however, since they will be filtered anyway it is simpler to just nil them.
       @terms = map{ $_ =~ s#([][\\+-:!(){}^~*?"&|])#\\$1#gr } @terms;
       @terms = map{ $_ =~ m#/# ? "\"$_\"" : $_ } @terms;
       my $termsRegular = join(' AND ', @terms);
