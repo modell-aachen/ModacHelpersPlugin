@@ -245,7 +245,6 @@ sub _handleRESTWebTopics {
       my $termsAsterisk = join(' AND ', map{ "(*$_* OR $_)" } @terms);
       $termsAsterisk = "($termsAsterisk)" if scalar @terms > 1;
 
-      Foswiki::Func::writeWarning("termsRegular $termsRegular  term $term");
       my @termQueryParts = (
           'title' . ($caseSensitive ? '' : '_search') . ":$termsRegular",
           "title:\"$term\"",
