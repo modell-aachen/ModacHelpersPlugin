@@ -376,6 +376,7 @@ sub getTempWebName {
         die "Modac temp web is not defined";
     }
     if( ! Foswiki::Func::webExists( $tempWebName ) ) {
+        local $Foswiki::Plugins::SESSION = Foswiki->new('BaseUserMapping_333', undef, undef);
         Foswiki::Func::createWeb( $tempWebName );
         my ($meta, $text) = Foswiki::Func::readTopic($tempWebName, "WebPreferences");
         $text .= "\n   * Set ALLOWWEBCHANGE = AdminGroup\n";
