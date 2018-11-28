@@ -49,13 +49,6 @@ sub initPlugin {
     description   => "Handler to move a topic to trash"
   );
 
-  Foswiki::Func::registerRESTHandler('loadHistoryVersion', \&_handleRESTloadHistoryVersion,
-    authenticate  => 1,
-    validate => 0,
-    http_allow    => 'GET',
-    description   => "Handler to get a Topic in a specific Verison"
-  );
-
   return 1;
 }
 
@@ -172,12 +165,9 @@ sub _getWebMapping {
   return %webMap;
 }
 
-sub _handleRESTloadHistoryVersion {
-  my ( $session, undef, undef, $response ) = @_;
+sub getLinkToTopicHistory {
+  my ($webtopic, $revision) = @_;
 
-  my $query = Foswiki::Func::getCgiQuery();
-  my $webtopic = $query->param('topic');
-  my $revision = $query->param('revision');
   my ($web, $topic) = Foswiki::Func::normalizeWebTopicName("", $webtopic);
   my $wfappId = Foswiki::Func::getPreferencesValue("WORKFLOWAPP_ID",$web);
   my $historyUrl;
@@ -186,7 +176,8 @@ sub _handleRESTloadHistoryVersion {
   } else {
       $historyUrl = Foswiki::Func::getScriptUrl($web, $topic, 'view', 'rev' => $revision)
   }
-  return to_json({url => $historyUrl});
+
+  return $historyUrl;
 }
 
 sub _handleRESTWebTopics {
