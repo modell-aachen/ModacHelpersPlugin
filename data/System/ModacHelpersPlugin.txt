@@ -1,5 +1,5 @@
-%META:TOPICPARENT{name="Contribs"}%
----+ ModacHelpers Contrib
+%META:TOPICPARENT{name="Plugins"}%
+---+ ModacHelpers Plugin
 
 %SHORTDESCRIPTION%
 
@@ -8,16 +8,16 @@ This Contrib provides several helper functions.
 ---++ Installation
 %$INSTALL_INSTRUCTIONS%
 
----++ Contrib Info
+---++ Plugin Info
 
 |  Author: | Modell Aachen !GmbH |
-|  Copyright: | 2016, Modell Aachen !GmbH, All Rights Reserved |
+|  Copyright: | 2018, Modell Aachen !GmbH, All Rights Reserved |
 |  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
 |  Dependencies: |  |
 |  Version: | %$VERSION% |
 |  Release: | %$RELEASE% |
 |  Change&nbsp;History: | <!-- versions below in reverse order -->&nbsp; |
-|  1.0.0 (2016.07.28): | Initial version |
-|  Home: | http://modell-aachen.de |
-|  Support: | http://modell-aachen.de |
+|  1.0.0 (2018.06.28): | Migrated from ModacHelpersContrib |
+|  Home: | https://modell-aachen.de |
+|  Support: | https://modell-aachen.de |
 
