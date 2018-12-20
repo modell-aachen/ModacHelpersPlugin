@@ -1,0 +1,19 @@
+# ModacHelpersPlugin translation for German
+# Translators:
+# ModellAachen
+msgid ""
+msgstr ""
+"Project-Id-Version: ModacHelpersPlugin $Id\n"
+"Report-Msgid-Bugs-To: support@modell-aachen.de\n"
+"POT-Creation-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"PO-Revision-Date: 2018-12-20 09:11+0200\n"
+"Last-Translator: Modell Aachen <support@modell-aachen.de>\n"
+"Language-Team: German\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+msgid "No topic parent"
+msgstr "Keine übergeordnete Seite"

@@ -185,7 +185,9 @@ sub _handleRESTWebTopics {
 
   my $request = Foswiki::Func::getRequestObject();
   my @websParam = $request->multi_param("web");
+  my $currentWeb = $request->param("current_web");
   my @websFilterParam = $request->multi_param("web_filter");
+  my $optionForNoTopicParent = $request->param('option_for_notopicparent');
   my $limit = $request->param("limit") || 10;
   my $page = $request->param("page") || 0;
   my $term = $request->param("term");
@@ -290,7 +292,16 @@ sub _handleRESTWebTopics {
     push @filteredWebTopics, {%webTopic};
   }
 
-  return to_json({results => \@filteredWebTopics});
+  if(!$page && $currentWeb && $optionForNoTopicParent) {
+      my $webHome = {
+          id => $Foswiki::cfg{HomeTopicName},
+          web => $currentWeb,
+          text => $session->i18n->maketext( "No topic parent" ),
+      };
+      unshift @filteredWebTopics, $webHome;
+  }
+
+  return to_json({results => \@filteredWebTopics, count => $content->{response}->{numFound}});
 }
 
 # Returns a list of FieldDefinitions, which are mandatory, but have no value.
