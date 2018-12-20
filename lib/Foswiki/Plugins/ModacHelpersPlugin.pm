@@ -292,7 +292,7 @@ sub _handleRESTWebTopics {
     push @filteredWebTopics, {%webTopic};
   }
 
-  if(!$page && $currentWeb && $optionForNoTopicParent) {
+  if(!$page && !$term && $currentWeb && $optionForNoTopicParent) {
       my $webHome = {
           id => $Foswiki::cfg{HomeTopicName},
           web => $currentWeb,
