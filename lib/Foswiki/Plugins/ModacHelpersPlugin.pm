@@ -326,7 +326,7 @@ sub getNonSatisfiedFormFields {
         next if defined $metadata && defined $metadata->{value} && $metadata->{value} ne '';
 
         my $fieldDef = $formDef->getField($field->{name});
-        next unless $fieldDef->isMandatory();
+        next unless $fieldDef && $fieldDef->isMandatory();
 
         $mappings = getDocumentFormTableMappings() unless defined $mappings;
 
