@@ -169,10 +169,10 @@ sub getLinkToTopicHistory {
   my ($webtopic, $revision) = @_;
 
   my ($web, $topic) = Foswiki::Func::normalizeWebTopicName("", $webtopic);
-  my $wfappId = Foswiki::Func::getPreferencesValue("WORKFLOWAPP_ID",$web);
+  my $instanceId = Foswiki::Func::getPreferencesValue("INSTANCE_ID",$web);
   my $historyUrl;
-  if($wfappId) {
-      $historyUrl = Foswiki::Func::getScriptUrl($Foswiki::cfg{SystemWebName}, 'WorkflowAppOverview', 'view')."#/history/$wfappId/$webtopic/$revision";
+  if($instanceId) {
+      $historyUrl = Foswiki::Func::getScriptUrl($Foswiki::cfg{SystemWebName}, 'WorkflowAppOverview', 'view')."#/history/$instanceId/$webtopic/$revision";
   } else {
       $historyUrl = Foswiki::Func::getScriptUrl($web, $topic, 'view', 'rev' => $revision)
   }
