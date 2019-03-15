@@ -1,4 +1,5 @@
 !noci
 data/System/ModacHelpersPlugin.txt 0644
 lib/Foswiki/Plugins/ModacHelpersPlugin.pm 0444
+lib/Foswiki/Plugins/ModacHelpersPlugin/Config.spec 0644
 locale/ModacHelpersPlugin/de.po 0644
