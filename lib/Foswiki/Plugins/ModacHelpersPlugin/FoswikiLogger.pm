@@ -152,6 +152,7 @@ sub _raven {
     $options{cuid} = Foswiki::Func::getCanonicalUserID();
     $options{remoteAddress} = $request->remoteAddress(),
     $options{uri} = $request->uri();
+    $options{baseUrl} = $request->url(-base => 1);
     $options{method} = $request->method();
     my %params = ();
     foreach my $param ($request->param()) {

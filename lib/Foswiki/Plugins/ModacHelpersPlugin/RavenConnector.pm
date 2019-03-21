@@ -30,7 +30,14 @@ sub sendMessage {
         );
         if($options{uri}) {
             my $data = "params=" . to_json($options{params} || {}, {pretty => 1}); # apparently raven supports only a single key=value pair
-            %ravenOptions = (%ravenOptions, Sentry::Raven->request_context($options{uri}, method => $options{method}, data => $data));
+            %ravenOptions = (
+                %ravenOptions,
+                Sentry::Raven->request_context(
+                    $options{uri},
+                    method => $options{method},
+                    data => $data
+                )
+            );
         }
         if($options{cuid} && $options{remoteAddress}) {
             %ravenOptions = (
@@ -44,10 +51,12 @@ sub sendMessage {
         if($options{release}) {
             $ravenOptions{release} = $options{release};
         }
+        $ravenOptions{extra} = {};
         if($options{traceString}) {
-            $ravenOptions{extra} = {
-                stacktrace => $options{traceString},
-            };
+            $ravenOptions{extra}{stacktrace} = $options{traceString};
+        }
+        if($options{baseUrl}) {
+            $ravenOptions{extra}{base_url} = $options{baseUrl};
         }
         $raven->capture_message(
             join(' | ', @$message),
