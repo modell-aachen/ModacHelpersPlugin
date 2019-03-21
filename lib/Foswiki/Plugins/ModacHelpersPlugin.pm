@@ -160,8 +160,8 @@ sub _getHideWebs {
 sub _getWebMapping {
   my ($meta, $webFacets) = @_;
 
-  my $webMappginPref = $meta->expandMacros("%MODAC_WEBMAPPINGS%");
-  my %webMap = map {$_ =~ /^(.*)=(.*)$/, $1=>$2} split(/\s*,\s*/, $webMappginPref);
+  my $webMappingPref = $meta->expandMacros("%MODAC_WEBMAPPINGS%");
+  my %webMap = map {$_ =~ /^(.*)=(.*)$/, $1=>$2} split(/\s*,\s*/, $webMappingPref);
   return %webMap;
 }
 
