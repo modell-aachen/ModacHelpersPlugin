@@ -101,9 +101,11 @@ sub logError {
 
     my $detailedPackage = getDetailedPackage($caller);
 
-    _raven($detailedPackage, ERROR, \@_);
+    my $traceString = _getTrace();
+    _raven($detailedPackage, ERROR, \@_, traceStriing => $traceString);
 
     unshift @_, ERROR;
+    push @_, $traceString;
     return $Foswiki::Plugins::SESSION->logger()->log(
         {
             level  => 'warning',
@@ -118,11 +120,7 @@ sub logFatal {
 
     my $detailedPackage = getDetailedPackage($caller);
 
-    my $trace = Devel::StackTrace->new(
-        ignore_package => __PACKAGE__,
-    );
-
-    my $traceString = $trace->as_string();
+    my $traceString = _getTrace();
 
     _raven($detailedPackage, FATAL, \@_, traceString => $traceString);
 
@@ -135,6 +133,16 @@ sub logFatal {
             extra  => \@_
         }
     );
+}
+
+sub _getTrace {
+    my $trace = Devel::StackTrace->new(
+        ignore_package => __PACKAGE__,
+    );
+
+    my $traceString = $trace->as_string();
+
+    return $traceString;
 }
 
 sub _raven {
