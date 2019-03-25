@@ -426,4 +426,15 @@ sub _handleRESTmoveTopicToTrash {
   Foswiki::Func::moveTopic($web, $topic, $Foswiki::cfg{TrashWebName}, $topic.time());
 }
 
+sub getDeletedImagePlaceholder {
+    my $lang = $Foswiki::Plugins::SESSION->i18n()->language();
+    $lang = 'en' unless $lang eq 'de';
+
+    my $attachment = "Keep_tidy_ask_$lang.svg";
+    my $redirectWeb = $Foswiki::cfg{SystemWebName};
+    my $redirectTopic = 'ModacHelpersPlugin';
+
+    return ($redirectWeb, $redirectTopic, $attachment);
+}
+
 1;

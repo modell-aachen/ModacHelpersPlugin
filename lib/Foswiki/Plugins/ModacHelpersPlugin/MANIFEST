@@ -7,3 +7,5 @@ lib/Foswiki/Plugins/ModacHelpersPlugin/Logger.pm 0444
 lib/Foswiki/Plugins/ModacHelpersPlugin/LoggerInstance.pm 0444
 lib/Foswiki/Plugins/ModacHelpersPlugin/RavenConnector.pm 0444
 locale/ModacHelpersPlugin/de.po 0644
+pub/System/ModacHelpersPlugin/Keep_tidy_ask_de.svg 0644
+pub/System/ModacHelpersPlugin/Keep_tidy_ask_en.svg 0644
