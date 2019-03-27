@@ -3,7 +3,6 @@ package Foswiki::Plugins::ModacHelpersPlugin::FoswikiLogger;
 use strict;
 use warnings;
 
-use Sentry::Raven;
 use Devel::StackTrace;
 
 use Foswiki::Plugins;
