@@ -160,8 +160,8 @@ sub _getHideWebs {
 sub _getWebMapping {
   my ($meta, $webFacets) = @_;
 
-  my $webMappginPref = $meta->expandMacros("%MODAC_WEBMAPPINGS{default=\"\"}%");
-  my %webMap = map {$_ =~ /^(.*)=(.*)$/, $1=>$2} split(/\s*,\s*/, $webMappginPref);
+  my $webMappingPref = $meta->expandMacros("%MODAC_WEBMAPPINGS%");
+  my %webMap = map {$_ =~ /^(.*)=(.*)$/, $1=>$2} split(/\s*,\s*/, $webMappingPref);
   return %webMap;
 }
 
@@ -169,10 +169,10 @@ sub getLinkToTopicHistory {
   my ($webtopic, $revision) = @_;
 
   my ($web, $topic) = Foswiki::Func::normalizeWebTopicName("", $webtopic);
-  my $wfappId = Foswiki::Func::getPreferencesValue("WORKFLOWAPP_ID",$web);
+  my $instanceId = Foswiki::Func::getPreferencesValue("INSTANCE_ID",$web);
   my $historyUrl;
-  if($wfappId) {
-      $historyUrl = Foswiki::Func::getScriptUrl($Foswiki::cfg{SystemWebName}, 'WorkflowAppOverview', 'view')."#/history/$wfappId/$webtopic/$revision";
+  if($instanceId) {
+      $historyUrl = Foswiki::Func::getScriptUrl($Foswiki::cfg{SystemWebName}, 'WorkflowAppOverview', 'view')."#/history/$instanceId/$webtopic/$revision";
   } else {
       $historyUrl = Foswiki::Func::getScriptUrl($web, $topic, 'view', 'rev' => $revision)
   }
@@ -185,7 +185,9 @@ sub _handleRESTWebTopics {
 
   my $request = Foswiki::Func::getRequestObject();
   my @websParam = $request->multi_param("web");
+  my $currentWeb = $request->param("current_web");
   my @websFilterParam = $request->multi_param("web_filter");
+  my $optionForNoTopicParent = $request->param('option_for_notopicparent');
   my $limit = $request->param("limit") || 10;
   my $page = $request->param("page") || 0;
   my $term = $request->param("term");
@@ -290,7 +292,16 @@ sub _handleRESTWebTopics {
     push @filteredWebTopics, {%webTopic};
   }
 
-  return to_json({results => \@filteredWebTopics});
+  if(!$page && !$term && $currentWeb && $optionForNoTopicParent) {
+      my $webHome = {
+          id => $Foswiki::cfg{HomeTopicName},
+          web => $currentWeb,
+          text => $session->i18n->maketext( "No topic parent" ),
+      };
+      unshift @filteredWebTopics, $webHome;
+  }
+
+  return to_json({results => \@filteredWebTopics, count => $content->{response}->{numFound}});
 }
 
 # Returns a list of FieldDefinitions, which are mandatory, but have no value.
@@ -413,6 +424,17 @@ sub _handleRESTmoveTopicToTrash {
 
   my ($web, $topic) = Foswiki::Func::normalizeWebTopicName("", $topicId);
   Foswiki::Func::moveTopic($web, $topic, $Foswiki::cfg{TrashWebName}, $topic.time());
+}
+
+sub getDeletedImagePlaceholder {
+    my $lang = $Foswiki::Plugins::SESSION->i18n()->language();
+    $lang = 'en' unless $lang eq 'de';
+
+    my $attachment = "Keep_tidy_ask_$lang.svg";
+    my $redirectWeb = $Foswiki::cfg{SystemWebName};
+    my $redirectTopic = 'ModacHelpersPlugin';
+
+    return ($redirectWeb, $redirectTopic, $attachment);
 }
 
 1;
