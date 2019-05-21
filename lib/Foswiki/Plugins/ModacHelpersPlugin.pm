@@ -437,4 +437,16 @@ sub getDeletedImagePlaceholder {
     return ($redirectWeb, $redirectTopic, $attachment);
 }
 
+sub getRmsCredentials {
+    my $rms = $Foswiki::cfg{Plugins}{ModacLogHelperPlugin}{rms} || 'rms.modac.eu';
+
+    my ($user, $key);
+    if($Foswiki::cfg{ExtensionsRepositories} =~ m#\Q$rms\E[^,]*,[^,]*,([^,]+),([^,]+)\)#) {
+        $user = $1;
+        $key = $2;
+    }
+
+    return $user, $key;
+}
+
 1;
