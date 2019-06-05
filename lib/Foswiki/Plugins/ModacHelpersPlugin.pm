@@ -152,7 +152,7 @@ sub _handleRESTWebs {
 
 sub _getHideWebs {
   my ($meta) = @_;
-  my $hideWebsPref = $meta->expandMacros("%MODAC_HIDEWEBS%");
+  my $hideWebsPref = $meta->expandMacros("%MODAC_HIDEWEBS{encode=\"none\"}%");
   my @hideWebs = split(/\|/,$hideWebsPref);
   return @hideWebs;
 }
@@ -160,7 +160,7 @@ sub _getHideWebs {
 sub _getWebMapping {
   my ($meta, $webFacets) = @_;
 
-  my $webMappingPref = $meta->expandMacros("%MODAC_WEBMAPPINGS%");
+  my $webMappingPref = $meta->expandMacros("%MODAC_WEBMAPPINGS{encode=\"none\"}%");
   my %webMap = map {$_ =~ /^(.*)=(.*)$/, $1=>$2} split(/\s*,\s*/, $webMappingPref);
   return %webMap;
 }
