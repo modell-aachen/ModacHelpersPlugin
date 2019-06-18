@@ -241,13 +241,13 @@ sub _handleRESTWebTopics {
       my @termQueryParts = (
           'title' . ($caseSensitive ? '' : '_search') . ":$termsRegular",
           "title:\"$term\"",
-          "title_ngram_search:\"$term\"",
           'topic' . ($caseSensitive ? '' : '_search') . ":$termsAsterisk",
           "topic:\"$term\"",
           'webtopic' . ($caseSensitive ? '' : '_search') . ":$termsAsterisk",
           "webtopic:\"$term\"",
+          "field_DocumentNumber_search:($termsAsterisk)",
       );
-      if($caseSensitive) {
+      if(!$caseSensitive) {
           push @termQueryParts, "title_ngram_search:\"$term\"",
       }
       $termQuery = '(' . join(' OR ', @termQueryParts) . ')';
@@ -268,7 +268,7 @@ sub _handleRESTWebTopics {
   my %params = (
     "rows" => $limit,
     "start" => $page * $limit,
-    "fl" => 'web,topic,webtopic,title,preference*',
+    "fl" => 'web,topic,webtopic,title,preference*,field_DocumentNumber_s',
     "sort" => 'title asc'
   );
 
@@ -284,10 +284,16 @@ sub _handleRESTWebTopics {
   my @filteredWebTopics = ();
   foreach my $topic (@webTopics) {
     my %topic = %{$topic};
+    my $documentNumber = '';
+    if($topic{field_DocumentNumber_s}) {
+      $documentNumber = $topic{field_DocumentNumber_s} . ' ';
+    }
+    my $webTopicText = $documentNumber . $topic{title};
     my %webTopic;
     $webTopic{id} = $topic{webtopic};
     $webTopic{web} = $topic{web};
-    $webTopic{text} = $topic{title};
+    $webTopic{text} =  $webTopicText;
+    $webTopic{DocumentNumber} = $topic{field_DocumentNumber_s};
 
     push @filteredWebTopics, {%webTopic};
   }
