@@ -227,6 +227,7 @@ sub _handleRESTWebTopics {
   );
   my $topicFilter = '-topic:(' .join(' OR ', @invalidTopics) .')';
   my $technicalTopicFilter = '-preference_TechnicalTopic_s:1';
+  my $contentTemplateFilter = '-preference_IS_CONTENT_TEMPLATE_s:1';
 
   my $termQuery;
   if($term) {
@@ -259,7 +260,7 @@ sub _handleRESTWebTopics {
   $query .= " AND $termQuery" if $termQuery;
   $query .= " AND $webRestrictionQuery" if $webRestrictionQuery;
   $query .= " AND $webFilter" if $webFilter;
-  $query .= " AND $topicFilter AND $technicalTopicFilter";
+  $query .= " AND $topicFilter AND $technicalTopicFilter AND $contentTemplateFilter";
   if($noDiscussions) {
       my $suffix = Foswiki::Func::expandCommonVariables("%WORKFLOWSUFFIX%");
       $query .= " AND -topic:*$suffix";
