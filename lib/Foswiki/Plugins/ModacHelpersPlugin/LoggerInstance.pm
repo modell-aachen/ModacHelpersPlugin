@@ -3,11 +3,8 @@ package Foswiki::Plugins::ModacHelpersPlugin::LoggerInstance;
 use strict;
 use warnings;
 
-use Devel::StackTrace;
-
 use Foswiki::Plugins;
 use Foswiki::Func;
-use Foswiki::Plugins::ModacHelpersPlugin::RavenConnector;
 
 use constant {
     FATAL => 'fatal',
