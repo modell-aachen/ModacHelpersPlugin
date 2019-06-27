@@ -142,7 +142,7 @@ sub _handleRESTWebs {
   my %webHash = @{$content->{facet_counts}->{facet_fields}->{web}};
   my @webFacets = keys %webHash;
 
-  my %webMap = _getWebMapping($meta, \@webFacets);
+  my %webMap = _getWebMapping($meta);
   foreach my $web (sort @webFacets) {
     push @webs, { id => $web, text => $webMap{$web} || $web};
   }
@@ -158,8 +158,7 @@ sub _getHideWebs {
 }
 
 sub _getWebMapping {
-  my ($meta, $webFacets) = @_;
-
+  my ($meta) = @_;
   my $webMappingPref = $meta->expandMacros("%MODAC_WEBMAPPINGS{encode=\"none\"}%");
   my %webMap = map {$_ =~ /^(.*)=(.*)$/, $1=>$2} split(/\s*,\s*/, $webMappingPref);
   return %webMap;
@@ -194,6 +193,11 @@ sub _handleRESTWebTopics {
   my $caseSensitive = Foswiki::Func::isTrue($request->param("case_sensitive"));
   my $noDiscussions = Foswiki::Func::isTrue($request->param("no_discussions"));
   my $json = JSON->new->utf8;
+
+  my $rootMeta = Foswiki::Meta->new($Foswiki::Plugins::SESSION);
+  my %webMappings = _getWebMapping($rootMeta);
+  $rootMeta->finish();
+
   # if only one element is given try to split by comma
   if( scalar @websParam == 1 ) {
     @websParam = split(/,/, $websParam[0]);
@@ -295,6 +299,7 @@ sub _handleRESTWebTopics {
     $webTopic{web} = $topic{web};
     $webTopic{text} =  $webTopicText;
     $webTopic{DocumentNumber} = $topic{field_DocumentNumber_s};
+    $webTopic{webDisplayValue} = $webMappings{$topic{web}} || $topic{web};
 
     push @filteredWebTopics, {%webTopic};
   }
@@ -304,6 +309,7 @@ sub _handleRESTWebTopics {
           id => $Foswiki::cfg{HomeTopicName},
           web => $currentWeb,
           text => $session->i18n->maketext( "No topic parent" ),
+          webDisplayValue => $webMappings{$currentWeb} || $currentWeb,
       };
       unshift @filteredWebTopics, $webHome;
   }
