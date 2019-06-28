@@ -294,12 +294,13 @@ sub _handleRESTWebTopics {
       $documentNumber = $topic{field_DocumentNumber_s} . ' ';
     }
     my $webTopicText = $documentNumber . $topic{title};
-    my %webTopic;
-    $webTopic{id} = $topic{webtopic};
-    $webTopic{web} = $topic{web};
-    $webTopic{text} =  $webTopicText;
-    $webTopic{DocumentNumber} = $topic{field_DocumentNumber_s};
-    $webTopic{webDisplayValue} = $webMappings{$topic{web}} || $topic{web};
+    my %webTopic = (
+      id => $topic{webtopic},
+      web => $topic{web},
+      text =>  $webTopicText,
+      DocumentNumber => $topic{field_DocumentNumber_s},
+      webDisplayValue => $webMappings{$topic{web}} || $topic{web},
+    );
 
     push @filteredWebTopics, {%webTopic};
   }
