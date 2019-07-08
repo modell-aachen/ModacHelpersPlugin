@@ -9,6 +9,10 @@ $Foswiki::cfg{ModacHelpersPlugin}{Environment} = 'production';
 # Use Sentry for backend logs.
 $Foswiki::cfg{Extensions}{ModacHelpersPlugin}{NoBackendSentry} = 0;
 
+# **BOOLEAN**
+# Use Sentry for frontend logs.
+$Foswiki::cfg{Extensions}{ModacHelpersPlugin}{NoFrontendSentry} = 0;
+
 # **SELECT 5, 4, 3, 2**
 # Global loglevel 5="DEBUG", 4="INFO", 3="WARNING", 2="ERROR" and 1="FATAL"
 $Foswiki::cfg{Extensions}{ModacHelpersPlugin}{ModacLogLevel} = 4;

@@ -142,7 +142,7 @@ sub _handleRESTWebs {
   my %webHash = @{$content->{facet_counts}->{facet_fields}->{web}};
   my @webFacets = keys %webHash;
 
-  my %webMap = _getWebMapping($meta, \@webFacets);
+  my %webMap = _getWebMapping($meta);
   foreach my $web (sort @webFacets) {
     push @webs, { id => $web, text => $webMap{$web} || $web};
   }
@@ -152,15 +152,14 @@ sub _handleRESTWebs {
 
 sub _getHideWebs {
   my ($meta) = @_;
-  my $hideWebsPref = $meta->expandMacros("%MODAC_HIDEWEBS%");
+  my $hideWebsPref = $meta->expandMacros("%MODAC_HIDEWEBS{encode=\"none\"}%");
   my @hideWebs = split(/\|/,$hideWebsPref);
   return @hideWebs;
 }
 
 sub _getWebMapping {
-  my ($meta, $webFacets) = @_;
-
-  my $webMappingPref = $meta->expandMacros("%MODAC_WEBMAPPINGS%");
+  my ($meta) = @_;
+  my $webMappingPref = $meta->expandMacros("%MODAC_WEBMAPPINGS{encode=\"none\"}%");
   my %webMap = map {$_ =~ /^(.*)=(.*)$/, $1=>$2} split(/\s*,\s*/, $webMappingPref);
   return %webMap;
 }
@@ -194,6 +193,11 @@ sub _handleRESTWebTopics {
   my $caseSensitive = Foswiki::Func::isTrue($request->param("case_sensitive"));
   my $noDiscussions = Foswiki::Func::isTrue($request->param("no_discussions"));
   my $json = JSON->new->utf8;
+
+  my $rootMeta = Foswiki::Meta->new($Foswiki::Plugins::SESSION);
+  my %webMappings = _getWebMapping($rootMeta);
+  $rootMeta->finish();
+
   # if only one element is given try to split by comma
   if( scalar @websParam == 1 ) {
     @websParam = split(/,/, $websParam[0]);
@@ -227,6 +231,7 @@ sub _handleRESTWebTopics {
   );
   my $topicFilter = '-topic:(' .join(' OR ', @invalidTopics) .')';
   my $technicalTopicFilter = '-preference_TechnicalTopic_s:1';
+  my $contentTemplateFilter = '-preference_IS_CONTENT_TEMPLATE_s:1';
 
   my $termQuery;
   if($term) {
@@ -241,13 +246,13 @@ sub _handleRESTWebTopics {
       my @termQueryParts = (
           'title' . ($caseSensitive ? '' : '_search') . ":$termsRegular",
           "title:\"$term\"",
-          "title_ngram_search:\"$term\"",
           'topic' . ($caseSensitive ? '' : '_search') . ":$termsAsterisk",
           "topic:\"$term\"",
           'webtopic' . ($caseSensitive ? '' : '_search') . ":$termsAsterisk",
           "webtopic:\"$term\"",
+          "field_DocumentNumber_search:($termsAsterisk)",
       );
-      if($caseSensitive) {
+      if(!$caseSensitive) {
           push @termQueryParts, "title_ngram_search:\"$term\"",
       }
       $termQuery = '(' . join(' OR ', @termQueryParts) . ')';
@@ -259,7 +264,7 @@ sub _handleRESTWebTopics {
   $query .= " AND $termQuery" if $termQuery;
   $query .= " AND $webRestrictionQuery" if $webRestrictionQuery;
   $query .= " AND $webFilter" if $webFilter;
-  $query .= " AND $topicFilter AND $technicalTopicFilter";
+  $query .= " AND $topicFilter AND $technicalTopicFilter AND $contentTemplateFilter";
   if($noDiscussions) {
       my $suffix = Foswiki::Func::expandCommonVariables("%WORKFLOWSUFFIX%");
       $query .= " AND -topic:*$suffix";
@@ -268,7 +273,7 @@ sub _handleRESTWebTopics {
   my %params = (
     "rows" => $limit,
     "start" => $page * $limit,
-    "fl" => 'web,topic,webtopic,title,preference*',
+    "fl" => 'web,topic,webtopic,title,preference*,field_DocumentNumber_s',
     "sort" => 'title asc'
   );
 
@@ -284,10 +289,18 @@ sub _handleRESTWebTopics {
   my @filteredWebTopics = ();
   foreach my $topic (@webTopics) {
     my %topic = %{$topic};
-    my %webTopic;
-    $webTopic{id} = $topic{webtopic};
-    $webTopic{web} = $topic{web};
-    $webTopic{text} = $topic{title};
+    my $documentNumber = '';
+    if($topic{field_DocumentNumber_s}) {
+      $documentNumber = $topic{field_DocumentNumber_s} . ' ';
+    }
+    my $webTopicText = $documentNumber . $topic{title};
+    my %webTopic = (
+      id => $topic{webtopic},
+      web => $topic{web},
+      text =>  $webTopicText,
+      DocumentNumber => $topic{field_DocumentNumber_s},
+      webDisplayValue => $webMappings{$topic{web}} || $topic{web},
+    );
 
     push @filteredWebTopics, {%webTopic};
   }
@@ -297,6 +310,7 @@ sub _handleRESTWebTopics {
           id => $Foswiki::cfg{HomeTopicName},
           web => $currentWeb,
           text => $session->i18n->maketext( "No topic parent" ),
+          webDisplayValue => $webMappings{$currentWeb} || $currentWeb,
       };
       unshift @filteredWebTopics, $webHome;
   }
@@ -435,6 +449,18 @@ sub getDeletedImagePlaceholder {
     my $redirectTopic = 'ModacHelpersPlugin';
 
     return ($redirectWeb, $redirectTopic, $attachment);
+}
+
+sub getRmsCredentials {
+    my $rms = $Foswiki::cfg{Plugins}{ModacLogHelperPlugin}{rms} || 'rms.modac.eu';
+
+    my ($user, $key);
+    if($Foswiki::cfg{ExtensionsRepositories} =~ m#\Q$rms\E[^,]*,[^,]*,([^,]+),([^,]+)\)#) {
+        $user = $1;
+        $key = $2;
+    }
+
+    return $user, $key;
 }
 
 1;

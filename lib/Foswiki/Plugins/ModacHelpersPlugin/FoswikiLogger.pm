@@ -3,11 +3,8 @@ package Foswiki::Plugins::ModacHelpersPlugin::FoswikiLogger;
 use strict;
 use warnings;
 
-use Devel::StackTrace;
-
 use Foswiki::Plugins;
 use Foswiki::Func;
-use Foswiki::Plugins::ModacHelpersPlugin::RavenConnector;
 
 use constant {
     FATAL => 'fatal',
@@ -58,6 +55,7 @@ sub logDebug {
         {
             level  => 'debug',
             caller => $detailedPackage,
+            deleteStacktraceFrames => 2,
             extra  => \@_
         }
     );
@@ -68,11 +66,11 @@ sub logInfo {
     return unless isLogLevelActive($caller, 4);
 
     my $detailedPackage = getDetailedPackage($caller);
-    unshift @_, INFO;
     return $Foswiki::Plugins::SESSION->logger()->log(
         {
             level  => 'debug',
             caller => $detailedPackage,
+            deleteStacktraceFrames => 2,
             extra  => \@_
         }
     );
@@ -82,14 +80,12 @@ sub logWarning {
     my $caller = shift;
 
     my $detailedPackage = getDetailedPackage($caller);
-
-    _raven($detailedPackage, WARNING, \@_);
-
     unshift @_, WARNING;
     return $Foswiki::Plugins::SESSION->logger()->log(
         {
             level  => 'warning',
             caller => $detailedPackage,
+            deleteStacktraceFrames => 2,
             extra  => \@_
         }
     );
@@ -99,16 +95,12 @@ sub logError {
     my $caller = shift;
 
     my $detailedPackage = getDetailedPackage($caller);
-
-    my $traceString = _getTrace();
-    _raven($detailedPackage, ERROR, \@_, traceStriing => $traceString);
-
     unshift @_, ERROR;
-    push @_, $traceString;
     return $Foswiki::Plugins::SESSION->logger()->log(
         {
             level  => 'warning',
             caller => $detailedPackage,
+            deleteStacktraceFrames => 2,
             extra  => \@_
         }
     );
@@ -118,58 +110,15 @@ sub logFatal {
     my $caller = shift;
 
     my $detailedPackage = getDetailedPackage($caller);
-
-    my $traceString = _getTrace();
-
-    _raven($detailedPackage, FATAL, \@_, traceString => $traceString);
-
     unshift @_, FATAL;
-    push @_, $traceString;
     return $Foswiki::Plugins::SESSION->logger()->log(
         {
             level  => 'warning',
             caller => $detailedPackage,
+            deleteStacktraceFrames => 2,
             extra  => \@_
         }
     );
-}
-
-sub _getTrace {
-    my $trace = Devel::StackTrace->new(
-        ignore_package => __PACKAGE__,
-    );
-
-    my $traceString = $trace->as_string();
-
-    return $traceString;
-}
-
-sub _raven {
-    my ($caller, $level, $message, %options) = @_;
-    my $request = Foswiki::Func::getRequestObject();
-
-    eval {
-        require Foswiki::Plugins::QueryVersionPlugin;
-        $options{release} = Foswiki::Plugins::QueryVersionPlugin::query(
-            $Foswiki::Plugins::SESSION,
-            { name => 'QwikiContrib' },
-        ) || '_unknown_';
-    };
-
-    $options{cuid} = Foswiki::Func::getCanonicalUserID();
-    $options{remoteAddress} = $request->remoteAddress(),
-    $options{uri} = $request->uri();
-    $options{baseUrl} = $request->url(-base => 1);
-    $options{method} = $request->method();
-    my %params = ();
-    foreach my $param ($request->param()) {
-        my @values = $request->param($param);
-        $params{$param} = \@values;
-    }
-    $options{params} = \%params;
-
-    my $error = Foswiki::Plugins::ModacHelpersPlugin::RavenConnector::sendMessage($caller, $level, $message, %options);
-    Foswiki::Func::writeWarning('Could not send message to sentry', $error) if $error;
 }
 
 1;
